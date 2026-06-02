@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Theme tokens — single source of truth for the color system.
+   Values are space-separated RGB channels so Tailwind's
+   `rgb(var(--c-x) / <alpha-value>)` can apply opacity utilities.
+   Switch data-theme on <html> to add more palettes later.
+   ============================================================ */
+:root,
+[data-theme='pharaoh'] {
+  --c-bg: 14 23 38; /* #0E1726 deep Nile-night blue */
+  --c-surface: 22 34 58; /* #16223A */
+  --c-surface-2: 30 45 74; /* #1E2D4A */
+  --c-border: 56 74 110; /* #384A6E */
+
+  --c-gold: 224 180 60; /* #E0B43C pharaoh gold */
+  --c-gold-bright: 244 206 94; /* #F4CE5E */
+  --c-gold-deep: 176 132 38; /* #B08426 */
+
+  --c-teal: 42 157 143; /* #2A9D8F Nile teal */
+  --c-clay: 199 91 57; /* #C75B39 terracotta */
+  --c-sand: 234 219 183; /* #EADBB7 papyrus */
+  --c-ink: 10 16 28; /* near-black for text on gold */
+
+  --c-text: 244 236 214; /* #F4ECD6 warm parchment */
+  --c-muted: 154 166 188; /* #9AA6BC */
+
+  --c-danger: 224 86 86; /* #E05656 */
+  --c-success: 86 196 138; /* #56C48A */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-bg font-body text-content antialiased;
+    margin: 0;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+    /* Layered atmosphere: gold glow + faint geometric weave */
+    background-color: rgb(var(--c-bg));
+    background-image:
+      radial-gradient(70% 55% at 50% -8%, rgb(var(--c-gold) / 0.1), transparent 60%),
+      radial-gradient(45% 45% at 100% 0%, rgb(var(--c-teal) / 0.08), transparent 55%),
+      radial-gradient(50% 50% at 0% 100%, rgb(var(--c-clay) / 0.07), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    letter-spacing: 0;
+  }
+
+  /* Honour reduced-motion preferences globally */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  /* Themed scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--c-border));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::selection {
+    background: rgb(var(--c-gold) / 0.3);
+    color: rgb(var(--c-text));
+  }
+}
+
+@layer components {
+  /* Decorative hieroglyph-style hairline used by section headers */
+  .hr-glyph {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--c-gold) / 0.5),
+      transparent
+    );
+  }
+
+  /* Gold text with a subtle metallic sheen */
+  .text-gold-sheen {
+    background: linear-gradient(
+      100deg,
+      rgb(var(--c-gold-bright)),
+      rgb(var(--c-gold)),
+      rgb(var(--c-gold-deep))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@layer utilities {
+  /* Respect safe areas on notched phones (mobile-first) */
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}

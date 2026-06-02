@@ -1,0 +1,16 @@
+# Normalise line endings to LF on checkin; let Git handle checkout per-OS.
+* text=auto eol=lf
+
+# Binary assets — never normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+
+# Treat SVG as text (it is XML) so diffs are readable.
+*.svg text eol=lf
