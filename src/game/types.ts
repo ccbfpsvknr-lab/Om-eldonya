@@ -67,6 +67,8 @@ export interface Player {
   solfaDebt: number;
   /** True if free-pass from rent active (from a chance card). */
   hasRentFreePass: boolean;
+  /** Turns remaining to skip (from chance card). */
+  skipTurns: number;
   /** Number of times sent to jail this match (for titles). */
   jailCount: number;
   /** Cumulative cash received this match (for titles). */

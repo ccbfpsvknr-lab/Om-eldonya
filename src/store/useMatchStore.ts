@@ -48,6 +48,10 @@ interface MatchState {
   ) => void;
   triggerNewsEvent: () => void;
   setWinner: (playerId: string | null) => void;
+  /** Roll dice in jail: pay 2% (if 6) or 4% of starting cash, always frees player. */
+  resolveJailTurn: (diceValue: number) => number;
+  markSkipTurn: (playerId: string) => void;
+  decrementSkipTurns: (playerId: string) => void;
   pendingNewsEvent: typeof NEWS_EVENTS[0] | null;
 }
 
@@ -438,6 +442,20 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       statistics: { ...s.game.statistics, finishedAt: Date.now() },
     }
   } : s),
+
+  resolveJailTurn: (diceValue) => {
+    const g = get().game;
+    if (!g) return 0;
+    const startingCash = g.mode === 'quick' ? FAST_STARTING_CASH : STARTING_CASH;
+    const pct = diceValue === 6 ? 0.02 : 0.04;
+    const fee = Math.round(startingCash * pct);
+    const idx = g.currentPlayerIndex;
+    const players = g.players.map((p, i) =>
+      i === idx ? { ...p, cash: p.cash - fee, jailTurns: 0 } : p
+    );
+    set({ game: { ...g, players } });
+    return fee;
+  },
 }));
 
 export { SALFA_AMOUNT, TAX_AMOUNT, NEWS_EVENTS };
