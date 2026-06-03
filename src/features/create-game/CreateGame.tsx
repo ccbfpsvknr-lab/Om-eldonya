@@ -78,16 +78,6 @@ export function CreateGame() {
           />
         </section>
 
-        {/* Rounds */}
-        <section className="space-y-3">
-          <SectionLabel>عدد الجولات</SectionLabel>
-          <Stepper
-            value={config.roundsCount}
-            min={1}
-            max={12}
-            onChange={(v) => updateConfig({ roundsCount: v })}
-          />
-        </section>
       </div>
     </ScreenContainer>
   );

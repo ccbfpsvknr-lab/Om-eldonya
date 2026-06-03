@@ -14,6 +14,13 @@ export const REGION_TIERS: Record<string, RegionTier> = {
   g: { price: 3000, baseRent: 300 },
   h: { price: 3400, baseRent: 340 },
 
+  // Fast (quick) board uses q1–q5: smaller prices tuned for 5000 starting cash
+  q1: { price: 400,  baseRent: 40  },
+  q2: { price: 650,  baseRent: 65  },
+  q3: { price: 950,  baseRent: 95  },
+  q4: { price: 1300, baseRent: 130 },
+  q5: { price: 1700, baseRent: 170 },
+
   // Full board uses f1–f9 (9 smaller regions, total city cost preserved at 44 000)
   f1: { price: 600,  baseRent: 60  },
   f2: { price: 950,  baseRent: 95  },

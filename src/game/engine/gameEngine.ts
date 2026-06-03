@@ -4,7 +4,7 @@ import { boardSizeForMode, buildCities, buildProjects, getBoard } from '../board
 import { createInitialDice } from './diceEngine';
 import { computeRegionOwners } from './economyEngine';
 import { buildShuffledDeck } from '../data/chanceCards';
-import { STARTING_CASH } from '../config';
+import { STARTING_CASH, FAST_STARTING_CASH } from '../config';
 
 export interface CreateGameParams {
   mode: GameMode;
@@ -40,7 +40,7 @@ export function toGamePlayers(lobby: LobbyPlayer[], startingCash: number): Playe
 
 export function createGame(params: CreateGameParams): Game {
   const boardSize = params.boardSize ?? boardSizeForMode(params.mode);
-  const startingCash = params.startingCash ?? STARTING_CASH;
+  const startingCash = params.startingCash ?? (params.mode === 'quick' ? FAST_STARTING_CASH : STARTING_CASH);
   const board = getBoard(boardSize);
   const jailTile = board.find((t) => t.type === 'jail');
   const jailTileIndex = jailTile?.index ?? 10;
