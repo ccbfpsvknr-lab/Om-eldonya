@@ -63,6 +63,7 @@ export function createGame(params: CreateGameParams): Game {
     newsRentMultiplier: 1,
     tradeUsedThisTurn: false,
     jailTileIndex,
+    eliminatedOrder: [],
     statistics: createInitialStatistics(),
   };
 

@@ -147,5 +147,7 @@ export interface Game {
   tradeUsedThisTurn: boolean;
   /** Jail tile index (derived from board). */
   jailTileIndex: number;
+  /** Player IDs in the order they went bankrupt — first = بليلة title. */
+  eliminatedOrder: string[];
   statistics: Statistics;
 }

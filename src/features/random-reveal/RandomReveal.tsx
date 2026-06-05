@@ -1,81 +1,160 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ScreenContainer } from '@/components/layout';
-import { Button, Card, Badge } from '@/components/ui';
 import { usePlayersStore, useGameStore, useMatchStore } from '@/store';
 import { ROUTES } from '@/lib/constants';
 import { shuffle } from '@/lib/shuffle';
 
-/**
- * The "draw" (القرعة). Randomises the play order from the setup players,
- * then creates the live match via the Stage 2A engine (useMatchStore).
- * Players keep their setup names; the randomness is the turn order + the
- * vehicle each player is assigned by their drawn position.
- */
+const POSITION_COLORS = [
+  '#E0B43C', // gold
+  '#2A9D8F', // teal
+  '#C75B39', // clay
+  '#9333EA', // purple
+  '#E05656', // red
+  '#56C48A', // green
+];
+
 export function RandomReveal() {
-  const navigate = useNavigate();
-  const players = usePlayersStore((s) => s.players);
-  const mode = useGameStore((s) => s.config.mode);
-  const setPhase = useGameStore((s) => s.setPhase);
+  const navigate    = useNavigate();
+  const players     = usePlayersStore((s) => s.players);
+  const mode        = useGameStore((s) => s.config.mode);
+  const setPhase    = useGameStore((s) => s.setPhase);
   const createMatch = useMatchStore((s) => s.createMatch);
 
-  // Shuffle once when the screen mounts (stable across re-renders).
   const order = useMemo(() => shuffle(players), [players]);
 
   const proceed = () => {
-    // Create the match from the randomised order, carrying the selected
-    // mode and the players' assigned (drawn) order + names.
     createMatch({ mode, players: order });
     setPhase('playing');
     navigate(ROUTES.board);
   };
 
   return (
-    <ScreenContainer
-      header={{ title: 'القرعة' }}
-      footer={
-        <Button block size="lg" disabled={order.length === 0} onClick={proceed}>
-          ابدأ الجولة
-        </Button>
-      }
-    >
-      <div className="flex flex-1 flex-col items-center justify-center gap-8">
-        <Card accent padding="lg" className="w-full animate-pop-in text-center">
-          <Badge tone="gold" className="mb-4">
-            القرعة اتعملت
-          </Badge>
-          <div className="mb-4 text-6xl">🎴</div>
-          <h3 className="mb-2 text-2xl text-gold-sheen">الترتيب اتحدد!</h3>
-          <p className="text-sm leading-relaxed text-muted">
-            ده ترتيب اللعب، وكل لاعب خد عربيته. اضغط «ابدأ الجولة» علشان تدخلوا اللوحة.
-          </p>
-        </Card>
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#060d1e]" dir="rtl">
 
+      {/* Background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 50%, rgba(224,180,60,0.07), transparent)' }} className="absolute inset-0"/>
+        {/* Decorative stars */}
+        {[...Array(20)].map((_, i) => (
+          <div key={i} className="absolute rounded-full bg-white"
+            style={{
+              width: `${1 + (i % 3) * 0.5}px`,
+              height: `${1 + (i % 3) * 0.5}px`,
+              top: `${5 + (i * 23 % 55)}%`,
+              left: `${(i * 37 % 90) + 5}%`,
+              opacity: 0.3 + (i % 4) * 0.15,
+            }}/>
+        ))}
+      </div>
+
+      {/* Header */}
+      <div className="relative z-10 flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0">
+        <button onClick={() => navigate(-1)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-[rgba(56,74,110,0.7)] bg-[rgba(14,23,38,0.8)] text-[#EADBB7]">
+          ←
+        </button>
+        <h1 className="font-extrabold text-[#EADBB7]"
+          style={{ fontFamily: "'Cairo', sans-serif", fontSize: '1.1rem' }}>
+          القرعة
+        </h1>
+      </div>
+
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 px-4 overflow-y-auto">
+
+        {/* Hero card */}
+        <div className="w-full rounded-2xl overflow-hidden animate-pop-in text-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(30,20,2,0.97), rgba(18,12,2,0.99))',
+            border: '1.5px solid rgba(224,180,60,0.5)',
+            boxShadow: '0 0 32px rgba(224,180,60,0.2), 0 8px 32px rgba(0,0,0,0.5)',
+          }}>
+
+          {/* Top gold bar */}
+          <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, transparent, #E0B43C, transparent)' }}/>
+
+          <div className="px-6 py-7">
+            {/* Dice illustration */}
+            <div className="mb-4 text-6xl" style={{ filter: 'drop-shadow(0 0 16px rgba(224,180,60,0.5))' }}>
+              🎲
+            </div>
+
+            {/* Ornament */}
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="h-px flex-1 max-w-16" style={{ background: 'linear-gradient(to left, rgba(224,180,60,0.6), transparent)' }}/>
+              <span className="text-[10px] tracking-[0.3em] font-bold" style={{ color: 'rgba(224,180,60,0.7)' }}>القرعة اتعملت</span>
+              <div className="h-px flex-1 max-w-16" style={{ background: 'linear-gradient(to right, rgba(224,180,60,0.6), transparent)' }}/>
+            </div>
+
+            <h2 className="text-2xl font-extrabold mb-2"
+              style={{ fontFamily: "'Rakkas', serif", color: '#F4CE5E', filter: 'drop-shadow(0 0 8px rgba(224,180,60,0.4))' }}>
+              الترتيب اتحدد!
+            </h2>
+            <p className="text-xs text-[#9AA6BC] leading-relaxed">
+              ده ترتيب اللعب. كل لاعب خد عربيته.<br/>اضغط «ابدأ الجولة» لما الكل يبص.
+            </p>
+          </div>
+        </div>
+
+        {/* Order list */}
         {order.length > 0 && (
-          <div className="w-full space-y-2">
-            <p className="text-center text-xs text-muted">ترتيب اللعب</p>
-            <ul className="space-y-2">
-              {order.map((p, i) => (
-                <li
-                  key={p.id}
-                  className="flex animate-scale-in items-center gap-3 rounded-2xl border border-border/70 bg-surface/70 p-3"
-                >
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-ink"
-                    style={{ backgroundColor: p.color }}
-                  >
-                    {i + 1}
+          <div className="w-full space-y-2.5">
+            {order.map((p, i) => (
+              <div key={p.id}
+                className="flex items-center gap-3 rounded-2xl overflow-hidden animate-scale-in"
+                style={{
+                  background: 'rgba(14,23,38,0.88)',
+                  border: `1.5px solid ${POSITION_COLORS[i % POSITION_COLORS.length]}40`,
+                  animationDelay: `${i * 0.08}s`,
+                }}>
+                {/* Position number */}
+                <div className="flex h-14 w-14 flex-col items-center justify-center flex-shrink-0"
+                  style={{ background: `${POSITION_COLORS[i % POSITION_COLORS.length]}18` }}>
+                  <span className="text-xs font-bold" style={{ color: POSITION_COLORS[i % POSITION_COLORS.length] }}>
+                    #{i + 1}
                   </span>
-                  <span className="flex-1 truncate font-bold text-content">{p.name}</span>
-                  <span className="text-2xl" aria-hidden>
-                    {p.vehicle}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  {i === 0 && <span className="text-[10px]" style={{ color: POSITION_COLORS[0] }}>أول</span>}
+                </div>
+
+                {/* Vehicle */}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl text-2xl flex-shrink-0"
+                  style={{ background: `${POSITION_COLORS[i % POSITION_COLORS.length]}18`, border: `1px solid ${POSITION_COLORS[i % POSITION_COLORS.length]}30` }}>
+                  {p.vehicle}
+                </div>
+
+                {/* Name */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-[#EADBB7] truncate"
+                    style={{ fontFamily: "'Cairo', sans-serif" }}>
+                    {p.name}
+                  </p>
+                  <p className="text-[10px]" style={{ color: POSITION_COLORS[i % POSITION_COLORS.length] }}>
+                    {i === 0 ? '🎯 يبدأ أول' : `بعد ${i} دور${i > 1 ? 'ات' : ''}`}
+                  </p>
+                </div>
+
+                {/* Color dot */}
+                <div className="w-2.5 h-2.5 rounded-full mr-3 flex-shrink-0"
+                  style={{ background: POSITION_COLORS[i % POSITION_COLORS.length], boxShadow: `0 0 8px ${POSITION_COLORS[i % POSITION_COLORS.length]}` }}/>
+              </div>
+            ))}
           </div>
         )}
       </div>
-    </ScreenContainer>
+
+      {/* Footer */}
+      <div className="relative z-10 px-4 pt-3 pb-4 flex-shrink-0">
+        <button onClick={proceed} disabled={order.length === 0}
+          className="w-full rounded-2xl py-4 font-bold transition-all active:scale-[0.98] disabled:opacity-40"
+          style={{
+            background: 'linear-gradient(135deg, #E8C040, #C49020)',
+            color: '#0E1726',
+            fontFamily: "'Cairo', sans-serif",
+            fontSize: '1.1rem',
+            boxShadow: '0 4px 20px rgba(224,180,60,0.4)',
+          }}>
+          ابدأ الجولة ✦
+        </button>
+      </div>
+    </div>
   );
 }

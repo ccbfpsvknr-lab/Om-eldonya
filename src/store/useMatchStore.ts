@@ -328,7 +328,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       p.id === playerId ? { ...p, isActive: false, cash: 0, solfaDebt: 0 } : p
     );
     const regionOwners = computeRegionOwners({ ...s.game, cities });
-    return { game: { ...s.game, players, cities, regionOwners } };
+    return { game: {
+      ...s.game, players, cities, regionOwners,
+      eliminatedOrder: [...s.game.eliminatedOrder, playerId],
+    }};
   }),
 
   payTax: () => {

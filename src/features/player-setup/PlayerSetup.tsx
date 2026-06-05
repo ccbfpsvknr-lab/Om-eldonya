@@ -1,7 +1,5 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ScreenContainer } from '@/components/layout';
-import { Button, Input, IconButton, Badge } from '@/components/ui';
 import { usePlayersStore, selectCanStart, useGameStore } from '@/store';
 import { useModal } from '@/hooks/useModal';
 import { ROUTES, PLAYER_LIMITS } from '@/lib/constants';
@@ -10,22 +8,18 @@ import { VEHICLES } from '@/lib/vehicles';
 import { randomNickname } from '@/lib/nicknames';
 
 export function PlayerSetup() {
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
   const { confirm } = useModal();
-
-  const players = usePlayersStore((s) => s.players);
-  const addPlayer = usePlayersStore((s) => s.addPlayer);
+  const players     = usePlayersStore((s) => s.players);
+  const addPlayer   = usePlayersStore((s) => s.addPlayer);
   const removePlayer = usePlayersStore((s) => s.removePlayer);
-  const canStart = usePlayersStore(selectCanStart);
+  const canStart    = usePlayersStore(selectCanStart);
+  const setPhase    = useGameStore((s) => s.setPhase);
+  const maxPlayers  = useGameStore((s) => s.config.maxPlayers);
 
-  const setPhase = useGameStore((s) => s.setPhase);
-  const maxPlayers = useGameStore((s) => s.config.maxPlayers);
-
-  // Track which vehicles are already taken
-  const takenVehicles = new Set(players.map((p) => p.vehicle));
+  const takenVehicles   = new Set(players.map((p) => p.vehicle));
   const availableVehicles = VEHICLES.filter((v) => !takenVehicles.has(v.emoji));
-  const firstAvailable = availableVehicles[0]?.emoji ?? VEHICLES[0].emoji;
-
+  const firstAvailable  = availableVehicles[0]?.emoji ?? VEHICLES[0].emoji;
   const [name, setName] = useState('');
   const [vehicle, setVehicle] = useState<string>(firstAvailable);
   const full = players.length >= Math.min(maxPlayers, PLAYER_LIMITS.max);
@@ -33,142 +27,196 @@ export function PlayerSetup() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (full) return;
-    const trimmed = name.trim();
-    // Empty name → random Egyptian nickname (not already used)
-    const finalName = trimmed || randomNickname(players.map((p) => p.name));
-    // Use currently selected vehicle (if taken, pick first available)
+    const finalName    = name.trim() || randomNickname(players.map((p) => p.name));
     const finalVehicle = takenVehicles.has(vehicle) ? firstAvailable : vehicle;
     addPlayer(finalName, finalVehicle);
     setName('');
-    // Advance selection to next available vehicle
     const remaining = VEHICLES.filter((v) => !takenVehicles.has(v.emoji) && v.emoji !== finalVehicle);
     setVehicle(remaining[0]?.emoji ?? VEHICLES[0].emoji);
   };
 
   const handleRemove = async (id: string, playerName: string) => {
-    const ok = await confirm({
-      title: 'إزالة لاعب',
-      message: `متأكد إنك عايز تشيل «${playerName}»؟`,
-      confirmLabel: 'شيله',
-      danger: true,
-    });
+    const ok = await confirm({ title: 'إزالة لاعب', message: `تشيل «${playerName}»؟`, confirmLabel: 'شيله', danger: true });
     if (ok) removePlayer(id);
   };
 
-  const start = () => {
-    setPhase('reveal');
-    navigate(ROUTES.reveal);
-  };
+  const start = () => { setPhase('reveal'); navigate(ROUTES.reveal); };
 
   return (
-    <ScreenContainer
-      header={{ title: 'اللاعبين' }}
-      footer={
-        <Button block size="lg" disabled={!canStart} onClick={start}>
-          {canStart ? 'يلا نبدأ' : `محتاجين ${PLAYER_LIMITS.min} لاعبين على الأقل`}
-        </Button>
-      }
-    >
-      <div className="space-y-6">
-        <form onSubmit={submit} className="flex gap-2">
-          <Input
-            name="playerName"
-            placeholder="اكتب اسم اللاعب (أو اتركه فارغ للاسم العشوائي)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={20}
-            disabled={full}
-            autoFocus
-          />
-          <Button type="submit" disabled={full} className="shrink-0 px-5">
-            ضيف
-          </Button>
-        </form>
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#060d1e]" dir="rtl">
 
-        {/* Vehicle picker — only available (unchosen) vehicles are shown */}
+      {/* Background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div style={{ background: 'radial-gradient(ellipse 100% 50% at 50% 100%, rgba(42,157,143,0.08), transparent)' }} className="absolute inset-0"/>
+        <div style={{ background: 'radial-gradient(ellipse 70% 40% at 50% 0%, rgba(14,23,38,0.8), transparent)' }} className="absolute inset-0"/>
+      </div>
+
+      {/* Header */}
+      <div className="relative z-10 flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0">
+        <button onClick={() => navigate(-1)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-[rgba(56,74,110,0.7)] bg-[rgba(14,23,38,0.8)] text-[#EADBB7]">
+          ←
+        </button>
+        <h1 className="flex-1 font-extrabold text-[#EADBB7]"
+          style={{ fontFamily: "'Cairo', sans-serif", fontSize: '1.1rem' }}>
+          اللاعبين
+        </h1>
+        <span className="rounded-xl border border-[rgba(56,74,110,0.5)] bg-[rgba(14,23,38,0.7)] px-3 py-1 text-xs text-[#9AA6BC]">
+          {players.length} / {Math.min(maxPlayers, PLAYER_LIMITS.max)}
+        </span>
+      </div>
+
+      <div className="relative z-10 flex flex-col flex-1 min-h-0 gap-4 overflow-y-auto px-4 pb-4">
+
+        {/* ── Add player form ── */}
         {!full && (
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-sand/90">اختار عربيتك</p>
-            <div className="grid grid-cols-3 gap-2">
-              {VEHICLES.map((v) => {
-                const taken = takenVehicles.has(v.emoji);
-                const active = v.emoji === vehicle && !taken;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => !taken && setVehicle(v.emoji)}
-                    disabled={taken}
-                    aria-pressed={active}
-                    className={cn(
-                      'flex flex-col items-center gap-1 rounded-2xl border p-3 transition-all',
-                      taken
-                        ? 'cursor-not-allowed border-border/30 bg-surface/30 opacity-40'
-                        : active
-                        ? 'border-gold/70 bg-gold/10 shadow-glow'
-                        : 'border-border/70 bg-surface/60 hover:border-gold/40',
-                    )}
-                  >
-                    <span className="text-3xl" aria-hidden>{v.emoji}</span>
-                    <span className="text-xs font-bold text-content">{v.name}</span>
-                    {taken && <span className="text-[9px] text-muted">محجوز</span>}
-                  </button>
-                );
-              })}
+          <form onSubmit={submit} className="rounded-2xl border border-[rgba(56,74,110,0.5)] bg-[rgba(14,23,38,0.85)] overflow-hidden">
+            {/* Name input */}
+            <div className="px-4 pt-4 pb-3">
+              <p className="text-xs font-bold text-[#9AA6BC] mb-2" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                اسم اللاعب (اختياري)
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="أو اتركه فارغ علشان اسم عشوائي"
+                  maxLength={20}
+                  autoComplete="off"
+                  className="flex-1 rounded-xl border border-[rgba(56,74,110,0.6)] bg-[rgba(22,34,58,0.8)] px-3 py-2.5 text-sm text-[#EADBB7] placeholder-[rgba(154,166,188,0.5)] outline-none focus:border-[rgba(224,180,60,0.5)]"
+                  style={{ fontFamily: "'Cairo', sans-serif" }}
+                />
+                <button type="submit"
+                  className="rounded-xl px-5 py-2.5 font-bold transition-all active:scale-95"
+                  style={{
+                    background: 'linear-gradient(135deg, #E8C040, #C49020)',
+                    color: '#0E1726',
+                    fontFamily: "'Cairo', sans-serif",
+                    fontSize: '0.9rem',
+                    boxShadow: '0 2px 12px rgba(224,180,60,0.3)',
+                  }}>
+                  ضيف
+                </button>
+              </div>
             </div>
+
+            {/* Vehicle picker */}
+            <div className="px-4 pb-4 border-t border-[rgba(56,74,110,0.3)] pt-3">
+              <p className="text-xs font-bold text-[#9AA6BC] mb-3" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                اختار عربيتك
+              </p>
+              <div className="grid grid-cols-6 gap-2">
+                {VEHICLES.map((v) => {
+                  const taken  = takenVehicles.has(v.emoji);
+                  const active = v.emoji === vehicle && !taken;
+                  return (
+                    <button key={v.id} type="button"
+                      disabled={taken}
+                      onClick={() => !taken && setVehicle(v.emoji)}
+                      className={cn(
+                        'flex flex-col items-center gap-1 rounded-xl py-2 transition-all',
+                        taken ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer active:scale-95',
+                      )}
+                      style={{
+                        background: active ? 'rgba(224,180,60,0.2)' : 'rgba(22,34,58,0.6)',
+                        border: `1.5px solid ${active ? 'rgba(224,180,60,0.7)' : 'rgba(56,74,110,0.4)'}`,
+                        boxShadow: active ? '0 0 14px rgba(224,180,60,0.3)' : 'none',
+                      }}>
+                      <span className="text-2xl leading-none">{v.emoji}</span>
+                      <span className="text-[8px] font-bold leading-none"
+                        style={{ color: active ? '#E0B43C' : '#9AA6BC' }}>
+                        {v.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* ── Players list ── */}
+        {players.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-[rgba(56,74,110,0.4)] py-12">
+            <span className="text-5xl opacity-50">🚗</span>
+            <p className="text-sm font-bold text-[#EADBB7] opacity-60"
+              style={{ fontFamily: "'Cairo', sans-serif" }}>
+              مفيش لاعبين لسه
+            </p>
+            <p className="text-xs text-[#9AA6BC] text-center max-w-[200px]">
+              ضيف الأسامي، أو اتركها فارغة وهنديلك اسم مصري 😄
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {players.map((p, idx) => (
+              <div key={p.id}
+                className="flex items-center gap-3 rounded-2xl overflow-hidden animate-scale-in"
+                style={{
+                  background: 'rgba(14,23,38,0.85)',
+                  border: '1px solid rgba(56,74,110,0.5)',
+                }}>
+                {/* Color stripe */}
+                <div className="w-1 self-stretch" style={{ background: p.color }}/>
+
+                {/* Vehicle */}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl text-2xl"
+                  style={{ background: `${p.color}22`, border: `1px solid ${p.color}44` }}>
+                  {p.vehicle}
+                </div>
+
+                {/* Name + info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-[#EADBB7] truncate"
+                    style={{ fontFamily: "'Cairo', sans-serif", fontSize: '0.9rem' }}>
+                    {p.name}
+                  </p>
+                  <p className="text-[10px] text-[#9AA6BC]">
+                    لاعب {idx + 1}
+                    {p.isHost && ' • المضيف'}
+                  </p>
+                </div>
+
+                {/* Host badge */}
+                {p.isHost && (
+                  <span className="text-[10px] font-bold rounded-full px-2 py-0.5"
+                    style={{ background: 'rgba(224,180,60,0.15)', color: '#E0B43C', border: '1px solid rgba(224,180,60,0.3)' }}>
+                    👑
+                  </span>
+                )}
+
+                {/* Remove */}
+                <button onClick={() => handleRemove(p.id, p.name)}
+                  className="ml-2 mr-3 flex h-7 w-7 items-center justify-center rounded-lg text-[#9AA6BC] hover:text-[#E05656] transition-colors text-sm">
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         )}
+      </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted">
-            {players.length} / {Math.min(maxPlayers, PLAYER_LIMITS.max)}
-          </span>
-          {full && <Badge tone="clay">اكتمل العدد</Badge>}
-        </div>
-
-        {players.length === 0 ? (
-          <EmptyState />
+      {/* ── Footer ── */}
+      <div className="relative z-10 px-4 pt-3 pb-4 flex-shrink-0">
+        {canStart ? (
+          <button onClick={start}
+            className="w-full rounded-2xl py-4 font-bold transition-all active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #E8C040, #C49020)',
+              color: '#0E1726',
+              fontFamily: "'Cairo', sans-serif",
+              fontSize: '1.1rem',
+              boxShadow: '0 4px 20px rgba(224,180,60,0.4)',
+            }}>
+            يلا نبدأ اللعبة ✦
+          </button>
         ) : (
-          <ul className="space-y-2">
-            {players.map((p) => (
-              <li
-                key={p.id}
-                className="flex animate-scale-in items-center gap-3 rounded-2xl border border-border/70 bg-surface/70 p-3"
-              >
-                <span
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl"
-                  style={{ backgroundColor: p.color }}
-                  aria-hidden
-                >
-                  {p.vehicle}
-                </span>
-                <span className="flex-1 truncate font-bold text-content">{p.name}</span>
-                {p.isHost && <Badge tone="gold">المضيف</Badge>}
-                <IconButton
-                  label={`إزالة ${p.name}`}
-                  size="sm"
-                  onClick={() => handleRemove(p.id, p.name)}
-                  className="hover:border-danger/50 hover:text-danger"
-                >
-                  ✕
-                </IconButton>
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-2xl border border-[rgba(56,74,110,0.4)] bg-[rgba(14,23,38,0.7)] py-4 text-center text-sm text-[#9AA6BC]"
+            style={{ fontFamily: "'Cairo', sans-serif" }}>
+            محتاجين {PLAYER_LIMITS.min} لاعبين على الأقل
+          </div>
         )}
       </div>
-    </ScreenContainer>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border/70 px-6 py-12 text-center">
-      <span className="text-5xl opacity-70">🧑‍🤝‍🧑</span>
-      <p className="font-bold text-content">لسه مفيش لاعبين</p>
-      <p className="text-sm text-muted">
-        ضيف أسامي أصحابك، أو اتركها فارغة وهيطلع اسم مصري عشوائي 😄
-      </p>
     </div>
   );
 }
