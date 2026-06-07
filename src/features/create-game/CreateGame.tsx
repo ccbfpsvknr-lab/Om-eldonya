@@ -96,13 +96,15 @@ export function CreateGame() {
           return (
             <button
               key={mode.id}
-              onClick={() => setMode(mode.id)}
+              onClick={() => mode.id !== 'custom' && setMode(mode.id)}
               className="relative w-full overflow-hidden rounded-2xl text-right transition-all duration-300"
               style={{
                 background: mode.bg,
                 border: `1.5px solid ${active ? mode.accent : 'rgba(56,74,110,0.4)'}`,
                 boxShadow: active ? `0 0 24px ${mode.glow}, 0 4px 16px rgba(0,0,0,0.4)` : '0 2px 12px rgba(0,0,0,0.3)',
                 transform: active ? 'scale(1.01)' : 'scale(1)',
+                opacity: mode.id === 'custom' ? 0.5 : 1,
+                cursor: mode.id === 'custom' ? 'not-allowed' : 'pointer',
               }}
             >
               {/* Card inner */}
