@@ -23,7 +23,7 @@ export const fastBoard: TileDef[] = [
   { type: 'city',   name: 'الغردقة',     groupId: 'q4' },      // 10
   { type: 'chance', name: 'فرصة' },                            // 11
   { type: 'city',   name: 'شرم الشيخ',   groupId: 'q4' },      // 12
-  { type: 'rest',   name: 'استراحة' },                         // 13 top-left corner
+  { type: 'rest',   name: 'القهوة' },                         // 13 top-left corner
   { type: 'city',   name: 'الجيزة',       groupId: 'q5' },      // 14 left column ↓
   { type: 'city',   name: 'القاهرة',      groupId: 'q5' },      // 15
 ];

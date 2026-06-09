@@ -27,7 +27,7 @@ export const fullBoard: TileDef[] = [
   { type: 'news',    name: 'أخبار' },                  // 17
   { type: 'city',    name: 'المنصورة',       groupId: 'f4' }, // 18
   { type: 'chance',  name: 'فرصة' },                   // 19
-  { type: 'rest',    name: 'استراحة' },                // 20
+  { type: 'rest',    name: 'القهوة' },                // 20
   { type: 'city',    name: 'الزقازيق',       groupId: 'f5' }, // 21
   { type: 'chance',  name: 'فرصة' },                   // 22
   { type: 'city',    name: 'بنها',            groupId: 'f5' }, // 23

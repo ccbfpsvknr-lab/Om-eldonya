@@ -17,7 +17,7 @@ export const regularBoard: TileDef[] = [
   { type: 'city', name: 'طنطا', groupId: 'c' },
   { type: 'city', name: 'المنصورة', groupId: 'c' },
   { type: 'project', name: 'شركة المياه' },
-  { type: 'rest', name: 'استراحة' },
+  { type: 'rest', name: 'القهوة' },
   { type: 'city', name: 'الزقازيق', groupId: 'd' },
   { type: 'chance', name: 'فرصة' },
   { type: 'city', name: 'بنها', groupId: 'd' },
