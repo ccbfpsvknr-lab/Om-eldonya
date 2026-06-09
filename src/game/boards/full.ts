@@ -7,7 +7,7 @@ import type { TileDef } from '../types';
  * Total city cost = 44 000 (preserved from original).
  */
 export const fullBoard: TileDef[] = [
-  { type: 'ramses',  name: 'ميدان رمسيس' },          // 0
+  { type: 'ramses',  name: 'محطة رمسيس' },          // 0
   { type: 'city',    name: 'العريش',        groupId: 'f1' }, // 1
   { type: 'news',    name: 'أخبار' },                  // 2
   { type: 'city',    name: 'مرسى مطروح',   groupId: 'f1' }, // 3

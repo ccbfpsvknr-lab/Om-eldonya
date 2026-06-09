@@ -50,6 +50,8 @@ interface MatchState {
   setWinner: (playerId: string | null) => void;
   /** Roll dice in jail: pay 2% (if 6) or 4% of starting cash, always frees player. */
   resolveJailTurn: (diceValue: number) => number;
+  payAmount: (amount: number) => number;
+  transferBetweenPlayers: (fromId: string, toId: string, amount: number) => void;
   markSkipTurn: (playerId: string) => void;
   decrementSkipTurns: (playerId: string) => void;
   pendingNewsEvent: typeof NEWS_EVENTS[0] | null;

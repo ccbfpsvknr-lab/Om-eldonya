@@ -5,11 +5,11 @@ import type { TileDef } from '../types';
  * 18 (police). Ramses pays +1500 on pass/land (see RAMSES_SALARY).
  */
 export const regularBoard: TileDef[] = [
-  { type: 'ramses', name: 'ميدان رمسيس' },
+  { type: 'ramses', name: 'محطة رمسيس' },
   { type: 'city', name: 'دمياط', groupId: 'a' },
   { type: 'chance', name: 'فرصة' },
   { type: 'city', name: 'بورسعيد', groupId: 'a' },
-  { type: 'project', name: 'محطة رمسيس' },
+  { type: 'project', name: 'الديوان المحلي' },
   { type: 'city', name: 'الإسماعيلية', groupId: 'b' },
   { type: 'jail', name: 'السجن' },
   { type: 'city', name: 'السويس', groupId: 'b' },
@@ -22,7 +22,7 @@ export const regularBoard: TileDef[] = [
   { type: 'chance', name: 'فرصة' },
   { type: 'city', name: 'بنها', groupId: 'd' },
   { type: 'city', name: 'الجيزة', groupId: 'e' },
-  { type: 'project', name: 'محطة سيدي جابر' },
+  { type: 'project', name: 'المحكمة الاقتصادية' },
   { type: 'police', name: 'روح السجن' },
   { type: 'city', name: 'الإسكندرية', groupId: 'e' },
   { type: 'news', name: 'أخبار' },

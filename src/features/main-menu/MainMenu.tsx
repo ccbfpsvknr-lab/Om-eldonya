@@ -233,10 +233,6 @@ export function MainMenu() {
             <span className="text-sm">🪙</span>
             <span className="text-xs font-bold text-[#F4CE5E]">0</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl border border-[rgba(42,157,143,0.3)] bg-[rgba(4,11,24,0.75)] px-2.5 py-1.5 backdrop-blur-md">
-            <span className="text-sm">💎</span>
-            <span className="text-xs font-bold text-[#2A9D8F]">0</span>
-          </div>
           <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-[rgba(56,74,110,0.7)] bg-[rgba(4,11,24,0.75)] text-base backdrop-blur-md hover:border-[rgba(224,180,60,0.4)] transition-colors">
             ⚙️
           </button>

@@ -10,7 +10,7 @@ import type { TileDef } from '../types';
  * Left column (top→bottom): 13,14,15,0
  */
 export const fastBoard: TileDef[] = [
-  { type: 'ramses', name: 'ميدان رمسيس' },                    // 0  bottom-left corner (START)
+  { type: 'ramses', name: 'محطة رمسيس' },                    // 0  bottom-left corner (START)
   { type: 'city',   name: 'الإسكندرية', groupId: 'q1' },      // 1  bottom row →
   { type: 'city',   name: 'مرسى مطروح', groupId: 'q1' },      // 2
   { type: 'chance', name: 'فرصة' },                            // 3

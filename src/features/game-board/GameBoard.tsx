@@ -107,7 +107,9 @@ export function GameBoard() {
   const bankruptPlayer   = useMatchStore((s) => s.bankruptPlayer);
   const sellCity         = useMatchStore((s) => s.sellCity);
   const takeSalfa        = useMatchStore((s) => s.takeSalfa);
-  const markSkipTurn     = useMatchStore((s) => s.markSkipTurn);
+  const markSkipTurn          = useMatchStore((s) => s.markSkipTurn);
+  const payAmount             = useMatchStore((s) => s.payAmount);
+  const transferBetweenPlayers= useMatchStore((s) => s.transferBetweenPlayers);
   const decrementSkipTurns = useMatchStore((s) => s.decrementSkipTurns);
   const resetMatch       = useMatchStore((s) => s.resetMatch);
   const resetGame        = useGameStore((s) => s.resetGame);
@@ -347,10 +349,28 @@ export function GameBoard() {
               checkInsolvency(player.id);
             }
           }}>
-            {card.type === 'bonus' && card.rollAgain ? 'ارمي تاني 🎲' : 'خلاص'}
+            {card.type === 'bonus' && card.rollAgain ? 'ارمي تاني ⚄' : 'خلاص'}
           </Button>
         </div>,
         { size: 'sm', dismissable: false, hideClose: true }
+      );
+
+    } else if (tile.type === 'project') {
+      const gid = open(
+        <GovOfficeModal
+          tileName={tile.name}
+          player={player}
+          allPlayers={g.players}
+          onDone={(action) => {
+            close(gid);
+            if (action === 'skip') { markSkipTurn(player.id); return; }
+            if (action === 'payAmount' && action !== undefined) return;
+          }}
+          payAmount={payAmount}
+          transferBetweenPlayers={transferBetweenPlayers}
+          checkInsolvency={checkInsolvency}
+        />,
+        { size: 'sm', hideClose: true, dismissable: false }
       );
 
     } else if (tile.type === 'tax') {
@@ -400,7 +420,7 @@ export function GameBoard() {
           setIsMoving(false); // then allow auto-end guard to pass
         }, 150);
       }
-    }, 200);
+    }, 150);
   }, [resolveLanding, showToast]);
 
   // ── Unified roll handler ──────────────────────────────────────────────────
@@ -488,9 +508,9 @@ export function GameBoard() {
   const gridSize     = tilesPerSide + 1;
   const diceLabel    = diceRolling
     ? (diceDisplay ? String(diceDisplay) : '?')
-    : lastRoll !== null ? `🎲 ${lastRoll}`
-    : isInJail ? '🎲 حاول تطلع!'
-    : '🎲 هات الزهر!';
+    : lastRoll !== null ? `${DICE_FACES[lastRoll]} ${lastRoll}`
+    : isInJail ? '⚄ حاول تطلع!'
+    : '⚄ هات الزهر!';
   const canDiceRoll = canRoll || isInJail;
 
   // Fast board uses 16:9 aspect; others use square
@@ -515,9 +535,7 @@ export function GameBoard() {
           style={{
             borderRadius: isFastBoard ? '12px' : '12px',
             boxShadow: '0 0 0 2px rgba(224,180,60,0.8), 0 0 0 5px #080603, 0 0 50px rgba(224,180,60,0.25)',
-            ...(isFastBoard
-              ? { backgroundImage: "url('/board-fast.png')", backgroundSize: '100% 100%', backgroundPosition: 'center' }
-              : { background: '#120d06', padding: '2px' }),
+            background: '#120d06', padding: '2px',
           }}>
           <div className="w-full h-full" dir="ltr"
             style={{
@@ -525,162 +543,76 @@ export function GameBoard() {
               gridTemplateColumns: gridCols,
               gridTemplateRows: gridRows,
               gap: '1px',
-              background: isFastBoard ? 'transparent' : '#0a0704',
+              background: '#0a0704',
             }}>
 
             {/* ── Perimeter tiles ── */}
             {game.board.map((tile) => {
-              const { col, row } = getGridPos(tile.index);
-              const edge         = getEdge(tile.index);
-              const isCorner     = isCornerTile(tile.index);
-              const isCurrent    = tile.index === cpVisualPos;
-              const occupants    = occupantsByTile.get(tile.index) ?? [];
-              const ownerColor   = ownerColorByTile.get(tile.index);
-              const upgradeLevel = tile.cityId ? (game.cities[tile.cityId]?.level ?? 0) : 0;
-              const hasSmoke     = tile.index === smokePos && isMoving;
-              const regionColor  = tile.cityId ? REGION_COLOR[game.cities[tile.cityId]?.region ?? ''] : undefined;
-              const landmark     = tile.cityId ? (CITY_EMOJI[tile.name] ?? '🏙️') : undefined;
-              const city         = tile.cityId ? game.cities[tile.cityId] : undefined;
-              const cpJailedHere = tile.type === 'jail' && cp.position === tile.index && cp.jailTurns > 0 && !animPos;
-
-              // Fast board: tiles are transparent overlays on the image
-              if (isFastBoard) {
-                return (
-                  <div key={tile.index}
-                    className={cn('relative overflow-hidden', isCurrent && 'z-10')}
-                    style={{
-                      gridColumn: col, gridRow: row,
-                      background: 'transparent',
-                      border: isCurrent ? `2px solid ${regionColor ?? '#E0B43C'}` : 'none',
-                      borderRadius: '4px',
-                      boxShadow: isCurrent ? `0 0 16px ${regionColor ?? '#E0B43C'}80, inset 0 0 20px rgba(0,0,0,0.3)` : 'none',
-                    }}>
-                    {/* Smoke */}
-                    {hasSmoke && (
-                      <div className="animate-smoke-out" style={{ position: 'absolute', inset: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '16px', pointerEvents: 'none', zIndex: 25 }}>💨</div>
-                    )}
-                    {/* Vehicles */}
-                    {occupants.length > 0 && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', zIndex: 20 }}>
-                        {occupants.map((o) => (
-                          <span key={o.id}
-                            className={cn(isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
-                            style={{
-                              fontSize: isCurrent && o.id === cp.id ? '20px' : '18px',
-                              filter: `drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 8px ${o.id===cp.id?'rgba(224,180,60,0.8)':'rgba(0,0,0,0.5)'})`,
-                              lineHeight: 1,
-                            }}>
-                            {o.vehicle}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {/* Owner dot for fast board */}
-                    {ownerColor && !isCurrent && (
-                      <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)',
-                        width: '6px', height: '6px', borderRadius: '50%', background: ownerColor,
-                        boxShadow: `0 0 4px ${ownerColor}`, zIndex: 10 }}/>
-                    )}
-                  </div>
-                );
-              }
-
-              // Non-fast: full tile visual
-              const isHoriz      = edge === 'left' || edge === 'right';
-              const roadFirst    = edge === 'top' || edge === 'left';
-              const cornerInfo   = isCorner ? CORNER_STYLE[tile.type] : null;
-              const specialInfo  = SPECIAL_STYLE[tile.type];
-              const ROAD_PCT     = isCorner ? 0 : (isHoriz ? 28 : 30);
+              const { col, row }  = getGridPos(tile.index);
+              const edge          = getEdge(tile.index);
+              const isCorner      = isCornerTile(tile.index);
+              const isCurrent     = tile.index === cpVisualPos;
+              const occupants     = occupantsByTile.get(tile.index) ?? [];
+              const ownerColor    = ownerColorByTile.get(tile.index);
+              const upgradeLevel  = tile.cityId ? (game.cities[tile.cityId]?.level ?? 0) : 0;
+              const hasSmoke      = tile.index === smokePos && isMoving;
+              const regionColor   = tile.cityId ? REGION_COLOR[game.cities[tile.cityId]?.region ?? ''] : undefined;
+              const landmark      = tile.cityId ? (CITY_EMOJI[tile.name] ?? '🏙️') : undefined;
+              const city          = tile.cityId ? game.cities[tile.cityId] : undefined;
+              const cpJailedHere  = tile.type === 'jail' && cp.position === tile.index && cp.jailTurns > 0 && !animPos;
+              const isHoriz       = edge === 'left' || edge === 'right';
+              const roadFirst     = edge === 'top' || edge === 'left';
+              const cornerInfo    = isCorner ? CORNER_STYLE[tile.type] : null;
+              const specialInfo   = SPECIAL_STYLE[tile.type];
+              const ROAD_PCT      = isHoriz ? 30 : 32;
+              const isOwned       = ownerColor !== undefined;
+              const fmt           = (n: number) => n >= 1000 ? `${(n/1000).toFixed(n % 1000 === 0 ? 0 : 1)}k` : String(n);
 
               const tileBg = isCorner
                 ? (cornerInfo?.bg ?? '#120d06')
                 : tile.type === 'city'
-                  ? regionColor ? `linear-gradient(135deg, ${regionColor}22, ${regionColor}0e)` : '#1a1208'
+                  ? regionColor ? `linear-gradient(135deg, ${regionColor}25, ${regionColor}10)` : '#1a1208'
                   : '#141008';
 
-              return (
-                <div key={tile.index}
-                  className={cn('relative overflow-hidden', isCurrent && 'animate-tile-ping z-10')}
-                  style={{ gridColumn: col, gridRow: row, background: tileBg,
-                    border: isCurrent ? `1.5px solid ${regionColor ?? '#E0B43C'}` : `1px solid #1c1508`,
-                    boxShadow: isCurrent ? `0 0 10px ${regionColor ?? '#E0B43C'}60` : 'none',
-                    display: 'flex', flexDirection: isHoriz ? 'row' : 'column' }}>
-
-                  {!isCorner && roadFirst && (
-                    <div style={{ flexShrink: 0, background: '#050402', position: 'relative',
-                      ...(isHoriz ? { width: `${ROAD_PCT}%`, height: '100%' } : { width: '100%', height: `${ROAD_PCT}%` }) }}>
-                      <div style={{ position: 'absolute',
-                        ...(isHoriz
-                          ? { top: '50%', left: 2, right: 2, transform: 'translateY(-50%)', height: '1px',
-                              background: 'repeating-linear-gradient(to bottom, rgba(255,220,80,0.3) 0px, rgba(255,220,80,0.3) 3px, transparent 3px, transparent 6px)' }
-                          : { left: '50%', top: 2, bottom: 2, transform: 'translateX(-50%)', width: '1px',
-                              background: 'repeating-linear-gradient(to right, rgba(255,220,80,0.3) 0px, rgba(255,220,80,0.3) 3px, transparent 3px, transparent 6px)' }) }}/>
-                      {ownerColor && <div style={{ position: 'absolute', inset: 0, opacity: 0.8,
-                        ...(isHoriz ? { borderRight: `2px solid ${ownerColor}` } : { borderBottom: `2px solid ${ownerColor}` }) }}/>}
-                    </div>
+              // Road strip with lane markings + owner bar + vehicles
+              const roadStrip = (pos: 'first' | 'last') => (
+                <div style={{
+                  flexShrink: 0, background: '#060503', position: 'relative',
+                  ...(isHoriz
+                    ? { width: `${ROAD_PCT}%`, height: '100%' }
+                    : { width: '100%', height: `${ROAD_PCT}%` }),
+                }}>
+                  {/* Lane dashes */}
+                  <div style={{ position: 'absolute',
+                    ...(isHoriz
+                      ? { top: '50%', left: 2, right: 2, transform: 'translateY(-50%)',
+                          height: '1px', background: 'repeating-linear-gradient(to bottom, rgba(255,220,80,0.4) 0px, rgba(255,220,80,0.4) 3px, transparent 3px, transparent 6px)' }
+                      : { left: '50%', top: 2, bottom: 2, transform: 'translateX(-50%)',
+                          width: '1px', background: 'repeating-linear-gradient(to right, rgba(255,220,80,0.4) 0px, rgba(255,220,80,0.4) 3px, transparent 3px, transparent 6px)' }),
+                  }}/>
+                  {/* Owner colour bar on the city-facing edge */}
+                  {ownerColor && (
+                    <div style={{ position: 'absolute', inset: 0,
+                      ...(isHoriz
+                        ? { [pos === 'first' ? 'borderRight' : 'borderLeft']: `3px solid ${ownerColor}` }
+                        : { [pos === 'first' ? 'borderBottom' : 'borderTop']: `3px solid ${ownerColor}` }),
+                      opacity: 0.9 }}/>
                   )}
-
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    justifyContent: isCorner ? 'center' : 'space-between', padding: '1px', overflow: 'hidden', minWidth: 0 }}>
-                    {isCorner ? (
-                      <>
-                        <div style={{ fontSize: tilesPerSide <= 4 ? '18px' : '11px', lineHeight: 1 }}>
-                          {cpJailedHere ? '🔒' : cornerInfo?.icon ?? '👑'}
-                        </div>
-                        <div style={{ fontSize: '5.5px', color: '#EADBB7', fontFamily: "'Cairo'", fontWeight: 700, textAlign: 'center', direction: 'rtl' }}>
-                          {cpJailedHere ? 'محبوس' : cornerInfo?.label ?? tile.name}
-                        </div>
-                      </>
-                    ) : tile.type === 'city' ? (
-                      <>
-                        <div style={{ fontSize: tilesPerSide <= 4 ? '14px' : '9px', lineHeight: 1 }}>{landmark}</div>
-                        <div style={{ fontSize: '5.5px', color: '#EADBB7', fontFamily: "'Cairo'", fontWeight: 700, textAlign: 'center', direction: 'rtl' }}>{tile.name}</div>
-                        {upgradeLevel > 0
-                          ? <div style={{ fontSize: '5px', color: '#E0B43C' }}>{'★'.repeat(upgradeLevel)}</div>
-                          : <div style={{ fontSize: '4.5px', color: '#D4A020' }}>🪙{city?.price ? (city.price>=1000?`${(city.price/1000).toFixed(0)}k`:city.price) : ''}</div>
-                        }
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: '10px', lineHeight: 1 }}>{SPECIAL_STYLE[tile.type]?.icon ?? '□'}</div>
-                        <div style={{ fontSize: '5px', color: '#9AA6BC', textAlign: 'center', direction: 'rtl' }}>{tile.name}</div>
-                      </>
-                    )}
-                  </div>
-
-                  {!isCorner && !roadFirst && (
-                    <div style={{ flexShrink: 0, background: '#050402', position: 'relative',
-                      ...(isHoriz ? { width: `${ROAD_PCT}%`, height: '100%' } : { width: '100%', height: `${ROAD_PCT}%` }) }}>
-                      <div style={{ position: 'absolute',
-                        ...(isHoriz
-                          ? { top: '50%', left: 2, right: 2, transform: 'translateY(-50%)', height: '1px',
-                              background: 'repeating-linear-gradient(to bottom, rgba(255,220,80,0.3) 0px, rgba(255,220,80,0.3) 3px, transparent 3px, transparent 6px)' }
-                          : { left: '50%', top: 2, bottom: 2, transform: 'translateX(-50%)', width: '1px',
-                              background: 'repeating-linear-gradient(to right, rgba(255,220,80,0.3) 0px, rgba(255,220,80,0.3) 3px, transparent 3px, transparent 6px)' }) }}/>
-                      {ownerColor && <div style={{ position: 'absolute', inset: 0, opacity: 0.8,
-                        ...(isHoriz ? { borderLeft: `2px solid ${ownerColor}` } : { borderTop: `2px solid ${ownerColor}` }) }}/>}
-                    </div>
-                  )}
-
-                  {upgradeLevel > 0 && (
-                    <div style={{ position: 'absolute', top: 1, left: 1, display: 'flex', gap: '1px', zIndex: 8 }}>
-                      {Array.from({ length: upgradeLevel }).map((_, i) => (
-                        <div key={i} style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#E0B43C' }}/>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ position: 'absolute', top: 0, right: 1, fontSize: '4px', color: 'rgba(154,166,188,0.35)', fontFamily: 'monospace' }}>{tile.index}</div>
-                  {hasSmoke && <div className="animate-smoke-out" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', zIndex: 25 }}>💨</div>}
+                  {/* Vehicles in the road */}
                   {occupants.length > 0 && (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', zIndex: 15 }}>
                       {occupants.map((o) => (
                         <span key={o.id}
-                          className={cn(isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
-                          style={{ fontSize: isCurrent && o.id === cp.id ? '13px' : '11px', lineHeight: 1,
-                            filter: o.id===cp.id ? 'drop-shadow(0 0 4px rgba(224,180,60,0.8))' : 'none' }}>
+                          className={cn(!isMoving && isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
+                          style={{
+                            fontSize: isFastBoard ? '14px' : '10px', lineHeight: 1,
+                            transform: isMoving && o.id === cp.id ? 'scale(1.4)' : 'scale(1)',
+                            transition: 'transform 0.12s ease',
+                            filter: o.id === cp.id
+                              ? 'drop-shadow(0 0 5px rgba(224,180,60,0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.9))'
+                              : 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
+                          }}>
                           {o.vehicle}
                         </span>
                       ))}
@@ -688,19 +620,133 @@ export function GameBoard() {
                   )}
                 </div>
               );
-            })}
 
+              return (
+                <div key={tile.index}
+                  className={cn('relative overflow-hidden', isCurrent && 'z-10')}
+                  style={{
+                    gridColumn: col, gridRow: row, background: tileBg,
+                    border: isCurrent ? `1.5px solid ${regionColor ?? '#E0B43C'}` : '1px solid rgba(20,14,6,0.9)',
+                    boxShadow: isCurrent ? `0 0 14px ${regionColor ?? '#E0B43C'}70` : 'none',
+                    display: 'flex',
+                    flexDirection: isCorner ? 'column' : (isHoriz ? 'row' : 'column'),
+                  }}>
+
+                  {/* Road on inward side — FIRST */}
+                  {!isCorner && roadFirst && roadStrip('first')}
+
+                  {/* ── Tile content ── */}
+                  {isCorner ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', gap: '2px', padding: '3px' }}>
+                      {occupants.length > 0 && (
+                        <div style={{ display: 'flex', gap: '1px', marginBottom: '2px' }}>
+                          {occupants.map((o) => (
+                            <span key={o.id} style={{ fontSize: isFastBoard ? '14px' : '10px',
+                              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))', lineHeight: 1 }}>
+                              {o.vehicle}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ fontSize: isFastBoard ? '20px' : '13px', lineHeight: 1 }}>
+                        {cpJailedHere ? '🔒' : cornerInfo?.icon ?? '👑'}
+                      </div>
+                      <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#EADBB7',
+                        fontFamily: "'Cairo'", fontWeight: 700, textAlign: 'center', direction: 'rtl', lineHeight: 1.2 }}>
+                        {cpJailedHere ? 'محبوس' : cornerInfo?.label ?? tile.name}
+                      </div>
+                    </div>
+
+                  ) : tile.type === 'city' ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'space-between',
+                      padding: '2px 1px', overflow: 'hidden', minWidth: 0 }}>
+                      {/* Landmark */}
+                      <div style={{ fontSize: isFastBoard ? '17px' : '12px', lineHeight: 1, flexShrink: 0 }}>
+                        {landmark}
+                      </div>
+                      {/* Name */}
+                      <div style={{ fontSize: isFastBoard ? '9px' : '7px', fontWeight: 800, color: '#EADBB7',
+                        fontFamily: "'Cairo'", textAlign: 'center', direction: 'rtl', lineHeight: 1.1,
+                        overflow: 'hidden', maxWidth: '100%', flexShrink: 0 }}>
+                        {tile.name}
+                      </div>
+                      {/* Price + Rent (or just Rent if owned) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
+                        {!isOwned ? (
+                          <>
+                            <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#E0B43C',
+                              lineHeight: 1, fontFamily: 'monospace', fontWeight: 700 }}>
+                              🪙{fmt(city?.price ?? 0)}
+                            </div>
+                            <div style={{ fontSize: isFastBoard ? '7px' : '5.5px', color: '#C75B39',
+                              lineHeight: 1, fontFamily: 'monospace' }}>
+                              🏠{city?.baseRent ?? 0}
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#C75B39',
+                            lineHeight: 1, fontFamily: 'monospace', fontWeight: 800 }}>
+                            🏠{city?.baseRent ?? 0}
+                          </div>
+                        )}
+                        {upgradeLevel > 0 && (
+                          <div style={{ fontSize: '6px', color: '#E0B43C', lineHeight: 1 }}>
+                            {'★'.repeat(upgradeLevel)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'space-between',
+                      padding: '2px 1px', overflow: 'hidden' }}>
+                      <div style={{ fontSize: isFastBoard ? '14px' : '10px', lineHeight: 1,
+                        filter: `drop-shadow(0 0 4px ${specialInfo?.border ?? 'rgba(224,180,60,0.4)'})` }}>
+                        {specialInfo?.icon ?? '□'}
+                      </div>
+                      <div style={{ fontSize: isFastBoard ? '7px' : '5.5px', color: '#9AA6BC',
+                        textAlign: 'center', direction: 'rtl', lineHeight: 1.1, overflow: 'hidden' }}>
+                        {tile.name}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Road on inward side — LAST */}
+                  {!isCorner && !roadFirst && roadStrip('last')}
+
+                  {/* Upgrade dots */}
+                  {upgradeLevel > 0 && (
+                    <div style={{ position: 'absolute', top: 1, left: 1, display: 'flex', gap: '1px', zIndex: 8 }}>
+                      {Array.from({ length: upgradeLevel }).map((_, i) => (
+                        <div key={i} style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#E0B43C' }}/>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Tile index */}
+                  <div style={{ position: 'absolute', top: 0, right: 1, fontSize: '4px',
+                    color: 'rgba(154,166,188,0.3)', fontFamily: 'monospace', lineHeight: 1, zIndex: 5 }}>
+                    {tile.index}
+                  </div>
+
+                  {/* Smoke */}
+                  {hasSmoke && (
+                    <div className="animate-smoke-out" style={{ position: 'absolute', inset: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '13px', pointerEvents: 'none', zIndex: 25 }}>💨</div>
+                  )}
+                </div>
+              );
+            })}
             {/* ── CENTER AREA ── */}
             <div style={{ gridColumn: centerCol, gridRow: centerRow, position: 'relative', overflow: 'hidden',
-              ...(isFastBoard
-                ? { backgroundImage: "url('/center-panel.png')", backgroundSize: '100% 100%', borderRadius: '8px' }
-                : { background: 'rgb(10 16 28 / 0.92)' }) }}>
+              background: 'rgb(10 16 28 / 0.92)' }}>
 
-              {/* Dark overlay for readability over the image */}
-              {isFastBoard && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', borderRadius: '8px', zIndex: 1 }}/>}
-
-              {/* Non-fast: mini Egyptian landscape */}
-              {!isFastBoard && (
+              {/* Mini Egyptian landscape */}
+              {(
                 <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden>
                   <defs>
                     <linearGradient id="csky" x1="0" y1="0" x2="0" y2="1">
@@ -737,10 +783,14 @@ export function GameBoard() {
                         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', lineHeight: 1 }}>
                         أم الدنيا
                       </h2>
-                      <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                         {game.activeNewsEvent && <span style={{ fontSize: '8px', background: 'rgba(199,91,57,0.3)', borderRadius: '4px', padding: '0 3px', color: '#C75B39' }}>📰</span>}
-                        <span style={{ fontSize: '7px', background: 'rgba(42,157,143,0.2)', borderRadius: '4px', padding: '0 3px', color: '#2A9D8F' }}>ج{game.round}</span>
-                        <button onClick={handleQuit} style={{ fontSize: '7px', color: 'rgba(154,166,188,0.5)', cursor: 'pointer', background: 'none', border: 'none' }}>✕</button>
+                        <button onClick={handleQuit}
+                          style={{ fontSize: '9px', fontWeight: 700, color: '#C75B39', cursor: 'pointer',
+                            background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)',
+                            borderRadius: '6px', padding: '3px 8px', lineHeight: 1 }}>
+                          ✕ خروج
+                        </button>
                       </div>
                     </div>
                   )}
@@ -765,44 +815,60 @@ export function GameBoard() {
                       </div>
                     </div>
 
-                    {myCities.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '3px' }}>
-                        {myCities.slice(0, 6).map((c) => {
-                          const rc = REGION_COLOR[c.region] ?? '#E0B43C';
-                          return (
-                            <span key={c.id} style={{ fontSize: isFastBoard ? '8px' : '5px', borderRadius: '3px', padding: '1px 3px',
-                              background: `${rc}20`, border: `1px solid ${rc}40`, color: rc, fontWeight: 700 }}>
-                              {CITY_EMOJI[c.name] ?? '🏙️'}{c.level > 0 ? '★'.repeat(c.level) : ''}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
+                    {myCities.length > 0 && (() => {
+                      const byRegion: Record<string, typeof myCities> = {};
+                      myCities.forEach(city => {
+                        if (!byRegion[city.region]) byRegion[city.region] = [];
+                        byRegion[city.region].push(city);
+                      });
+                      return (
+                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          {Object.entries(byRegion).map(([region, cities]) => {
+                            const rc = REGION_COLOR[region] ?? '#E0B43C';
+                            return (
+                              <div key={region} style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                                {cities.map(city => (
+                                  <span key={city.id} style={{
+                                    fontSize: isFastBoard ? '9px' : '6px', fontWeight: 700,
+                                    borderRadius: '3px', padding: '1px 4px', whiteSpace: 'nowrap',
+                                    background: `${rc}22`, border: `1px solid ${rc}50`, color: rc,
+                                  }}>
+                                    {city.name}{city.level > 0 ? ' ' + '★'.repeat(city.level) : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
 
-                    {/* Dice button */}
-                    <button onClick={handleRoll} disabled={!canDiceRoll || isMoving}
-                      style={{
-                        marginTop: '5px', width: '100%', borderRadius: '8px', border: 'none',
-                        padding: isFastBoard ? '10px 8px' : '4px',
-                        fontFamily: "'Cairo', sans-serif",
-                        fontSize: isFastBoard ? '14px' : '8px', fontWeight: 800,
-                        cursor: canDiceRoll ? 'pointer' : 'default',
-                        opacity: (!canDiceRoll || isMoving) ? 0.45 : 1, transition: 'all 0.15s',
-                        background: diceRolling ? 'linear-gradient(135deg, #E0B43C, #C49020)'
-                          : lastRoll !== null ? 'linear-gradient(135deg, #3a2a08, #2a1e06)'
-                          : canDiceRoll ? 'linear-gradient(135deg, #E8C040, #C49020)'
-                          : 'rgba(30,22,8,0.8)',
-                        color: diceRolling || (canDiceRoll && lastRoll === null) ? '#0E1726' : '#E0B43C',
-                        boxShadow: canDiceRoll && !diceRolling && lastRoll===null ? '0 4px 16px rgba(224,180,60,0.5)' : 'none',
-                      }}
-                      className={diceRolling ? 'animate-dice-shake' : ''}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: diceRolling ? (isFastBoard?'22px':'14px') : (isFastBoard?'18px':'11px') }}>
-                          {diceRolling ? (DICE_FACES[diceDisplay ?? 1]||'?') : lastRoll !== null ? DICE_FACES[lastRoll] : '🎲'}
-                        </span>
-                        <span>{diceLabel}</span>
-                      </div>
-                    </button>
+                    {/* Dice button — square */}
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '5px' }}>
+                      <button onClick={handleRoll} disabled={!canDiceRoll || isMoving}
+                        style={{
+                          width: isFastBoard ? '72px' : '46px',
+                          height: isFastBoard ? '72px' : '46px',
+                          borderRadius: '10px', border: 'none', flexShrink: 0,
+                          fontFamily: "'Cairo', sans-serif", fontWeight: 800,
+                          cursor: canDiceRoll ? 'pointer' : 'default',
+                          opacity: (!canDiceRoll || isMoving) ? 0.45 : 1, transition: 'all 0.15s',
+                          background: diceRolling ? 'linear-gradient(135deg, #E0B43C, #C49020)'
+                            : lastRoll !== null ? 'linear-gradient(135deg, #3a2a08, #2a1e06)'
+                            : canDiceRoll ? 'linear-gradient(135deg, #E8C040, #C49020)'
+                            : 'rgba(30,22,8,0.8)',
+                          color: diceRolling || (canDiceRoll && lastRoll === null) ? '#0E1726' : '#E0B43C',
+                          boxShadow: canDiceRoll && !diceRolling && lastRoll===null ? '0 4px 20px rgba(224,180,60,0.55)' : 'none',
+                        }}
+                        className={diceRolling ? 'animate-dice-shake' : ''}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                          <span style={{ fontSize: diceRolling ? (isFastBoard?'26px':'18px') : (isFastBoard?'22px':'14px'), lineHeight: 1 }}>
+                            {diceRolling ? (DICE_FACES[diceDisplay ?? 1]||'?') : lastRoll !== null ? DICE_FACES[lastRoll] : '⚄'}
+                          </span>
+                          <span style={{ fontSize: isFastBoard ? '8px' : '6px', lineHeight: 1 }}>{diceLabel.replace(/^[⚀-⚅]\s*/,'').replace('🎲 ','')}</span>
+                        </div>
+                      </button>
+                    </div>
 
                     {(canEnd || canUpgradeAny || canTrade) && (
                       <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>
@@ -819,11 +885,15 @@ export function GameBoard() {
                     )}
                   </div>
 
-                  {/* Quit + round (fast mode only, small) */}
+                  {/* Quit (fast mode only) */}
                   {isFastBoard && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
-                      <button onClick={handleQuit} style={{ fontSize: '9px', color: 'rgba(154,166,188,0.5)', cursor: 'pointer', background: 'none', border: 'none' }}>✕ خروج</button>
-                      <span style={{ fontSize: '8px', background: 'rgba(42,157,143,0.2)', borderRadius: '4px', padding: '1px 5px', color: '#2A9D8F' }}>ج{game.round}</span>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <button onClick={handleQuit}
+                        style={{ fontSize: '11px', fontWeight: 700, color: '#C75B39', cursor: 'pointer',
+                          background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)',
+                          borderRadius: '8px', padding: '5px 14px', lineHeight: 1 }}>
+                        ✕ خروج
+                      </button>
                     </div>
                   )}
                 </div>
@@ -837,21 +907,31 @@ export function GameBoard() {
                   <div style={{ fontSize: isFastBoard?'9px':'6px', color: '#9AA6BC', marginBottom: '4px', fontFamily: "'Cairo'", fontWeight: 700 }}>
                     مين فوق 💰
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: isFastBoard?'4px':'2px', overflow: 'hidden' }}>
-                    {sortedPlayers.map((p, i) => (
-                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px',
-                        borderRadius: '4px', padding: isFastBoard?'4px 6px':'1px 2px',
-                        background: p.id===cp.id ? 'rgba(224,180,60,0.12)' : 'transparent',
-                        opacity: p.isActive ? 1 : 0.4 }}>
-                        <span style={{ fontSize: isFastBoard?'8px':'6px', color: '#9AA6BC', width: '10px', textAlign: 'right', fontFamily: 'monospace' }}>{i+1}</span>
-                        <span style={{ fontSize: isFastBoard?'14px':'10px', lineHeight: 1 }}>{p.vehicle}</span>
-                        <span style={{ flex: 1, fontSize: isFastBoard?'10px':'6px', color: '#EADBB7', fontFamily: "'Cairo'", fontWeight: 700, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.name}</span>
-                        {p.jailTurns > 0 && <span style={{ fontSize: isFastBoard?'9px':'7px' }}>🔒</span>}
-                        <span style={{ fontSize: isFastBoard?'10px':'6px', fontWeight: 800, color: p.cash<0?'#E05656':'#E0B43C', fontFamily: 'monospace', lineHeight: 1 }}>
-                          {p.isActive ? p.cash.toLocaleString('en-US') : '💀'}
-                        </span>
-                      </div>
-                    ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: isFastBoard?'5px':'3px', overflow: 'hidden' }}>
+                    {sortedPlayers.map((p, i) => {
+                      const cashStr = p.isActive
+                        ? (p.cash >= 1000 ? `${(p.cash/1000).toFixed(1)}k` : String(p.cash))
+                        : '💀';
+                      return (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '3px',
+                          borderRadius: '5px', padding: isFastBoard?'4px 5px':'2px 3px',
+                          background: p.id===cp.id ? 'rgba(224,180,60,0.15)' : 'rgba(255,255,255,0.03)',
+                          border: p.id===cp.id ? '1px solid rgba(224,180,60,0.25)' : '1px solid transparent',
+                          opacity: p.isActive ? 1 : 0.4 }}>
+                          <span style={{ fontSize: isFastBoard?'15px':'11px', lineHeight: 1, flexShrink: 0 }}>{p.vehicle}</span>
+                          <span style={{ flex: 1, fontSize: isFastBoard?'11px':'7px', color: p.id===cp.id?'#F4CE5E':'#EADBB7',
+                            fontFamily: "'Cairo'", fontWeight: 700,
+                            overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                            {p.name}
+                          </span>
+                          {p.jailTurns > 0 && <span style={{ fontSize: isFastBoard?'9px':'7px', flexShrink: 0 }}>🔒</span>}
+                          <span style={{ fontSize: isFastBoard?'11px':'7px', fontWeight: 800,
+                            color: p.cash<0?'#E05656':'#E0B43C', fontFamily: 'monospace', lineHeight: 1, flexShrink: 0 }}>
+                            {cashStr}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1216,6 +1296,159 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── GOVERNMENT OFFICE MODAL ─────────────────────────────────────────────────
+function GovOfficeModal({ tileName, player, allPlayers, onDone, payAmount, transferBetweenPlayers, checkInsolvency }: {
+  tileName: string;
+  player: Player;
+  allPlayers: Player[];
+  onDone: (action: string) => void;
+  payAmount: (amount: number) => number;
+  transferBetweenPlayers: (fromId: string, toId: string, amount: number) => void;
+  checkInsolvency: (id: string) => void;
+}) {
+  const activePlayers = allPlayers.filter((p) => p.isActive);
+  const myCities = Object.keys({}).length; // placeholder — resolved below
+
+  if (tileName === 'الديوان المحلي') {
+    const canAffordBribe = player.cash >= 300;
+    return (
+      <div className="space-y-4 text-center" dir="rtl">
+        <div className="text-5xl">🏛️</div>
+        <h3 className="text-2xl font-extrabold text-gold-sheen">الديوان المحلي</h3>
+        <p className="text-sm text-content leading-relaxed">
+          الموظف مش موجود… السيستم واقع… والأوراق ضاعت 😤<br/>
+          تدفع ولا تستنى؟
+        </p>
+        <div className="flex gap-3">
+          <button onClick={() => { onDone('skip'); }}
+            className="flex-1 rounded-xl py-3 text-sm font-bold"
+            style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC' }}>
+            استنى الدور الجاي 😤
+          </button>
+          <button disabled={!canAffordBribe}
+            onClick={() => { payAmount(300); checkInsolvency(player.id); onDone('paid'); }}
+            className="flex-1 rounded-xl py-3 text-sm font-bold"
+            style={{
+              background: canAffordBribe ? 'linear-gradient(135deg,#E8C040,#C49020)' : 'rgba(56,74,110,0.3)',
+              color: canAffordBribe ? '#0E1726' : '#9AA6BC',
+              border: 'none', cursor: canAffordBribe ? 'pointer' : 'not-allowed',
+            }}>
+            {canAffordBribe ? 'بلّط! ادفع ٣٠٠ 💸' : 'الجيب فاضي 😅'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (tileName === 'شركة المياه') {
+    const cities = allPlayers.find(p => p.id === player.id)?.id; // just to scope
+    // count player's cities from game state via allPlayers is not available directly —
+    // use payAmount hook logic: bill = max(150, cityCount * 150)
+    // We pass player but not game cities, so show flat 150 per turn
+    const bill = 150;
+    return (
+      <div className="space-y-4 text-center" dir="rtl">
+        <div className="text-5xl">💧</div>
+        <h3 className="text-2xl font-extrabold text-gold-sheen">شركة المياه</h3>
+        <p className="text-sm text-content leading-relaxed">
+          وصلتك فاتورة المياه يا أخي!<br/>
+          وماعدش فيه كلام 😶
+        </p>
+        <p className="text-xl font-extrabold text-clay">−{bill.toLocaleString('en-US')} جنيه</p>
+        <button onClick={() => { payAmount(bill); checkInsolvency(player.id); onDone('paid'); }}
+          className="w-full rounded-xl py-3 font-bold text-sm"
+          style={{ background: 'linear-gradient(135deg,#1E6FA0,#155080)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          أمر… ادفع 💧
+        </button>
+      </div>
+    );
+  }
+
+  if (tileName === 'المحكمة الاقتصادية') {
+    const sorted = [...activePlayers].sort((a, b) => b.cash - a.cash);
+    const richest = sorted[0];
+    const poorest = sorted[sorted.length - 1];
+    const amount  = 400;
+    const iAmRichest = richest?.id === player.id;
+    const iAmPoorest = poorest?.id === player.id;
+    const samePlayer = richest?.id === poorest?.id;
+    return (
+      <div className="space-y-4 text-center" dir="rtl">
+        <div className="text-5xl">⚖️</div>
+        <h3 className="text-2xl font-extrabold text-gold-sheen">المحكمة الاقتصادية</h3>
+        <p className="text-sm text-content leading-relaxed">
+          القضية: توزيع الثروة في الحي
+        </p>
+        {samePlayer ? (
+          <p className="text-sm text-muted">لاعب واحد بس؟ القاضي قال خلاص 😂</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-content">
+              {iAmRichest
+                ? `أنت الأغنى في الشارع ده، ادفع ${amount} للأفقر 😬`
+                : iAmPoorest
+                  ? `أنت الأفقر دلوقتي، خد ${amount} من الأغنى 🤑`
+                  : `القاضي حكم: ${richest?.name} يدفع ${amount} لـ ${poorest?.name}`
+              }
+            </p>
+            <div className="flex justify-center gap-4 text-xs text-muted">
+              <span>الأغنى: {richest?.name} ({richest?.cash.toLocaleString('en-US')})</span>
+              <span>الأفقر: {poorest?.name} ({poorest?.cash.toLocaleString('en-US')})</span>
+            </div>
+          </div>
+        )}
+        <button onClick={() => {
+          if (!samePlayer && richest && poorest) {
+            transferBetweenPlayers(richest.id, poorest.id, amount);
+            if (iAmRichest) checkInsolvency(richest.id);
+          }
+          onDone('done');
+        }}
+          className="w-full rounded-xl py-3 font-bold text-sm"
+          style={{ background: 'linear-gradient(135deg,#7C3AED,#5B21B6)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          يا ريتني كنت فاهم القانون 😂
+        </button>
+      </div>
+    );
+  }
+
+  if (tileName === 'شركة الكهرباء') {
+    const pct   = 0.10;
+    const raw   = Math.round(player.cash * pct);
+    const bill  = Math.min(Math.max(raw, 200), 2000);
+    return (
+      <div className="space-y-4 text-center" dir="rtl">
+        <div className="text-5xl">⚡</div>
+        <h3 className="text-2xl font-extrabold text-gold-sheen">شركة الكهرباء</h3>
+        <p className="text-sm text-content leading-relaxed">
+          فاتورتك وصلت… وده اللي أنت فيه 😬<br/>
+          ١٠٪ من رصيدك
+        </p>
+        <p className="text-xl font-extrabold text-clay">−{bill.toLocaleString('en-US')} جنيه</p>
+        <button onClick={() => { payAmount(bill); checkInsolvency(player.id); onDone('paid'); }}
+          className="w-full rounded-xl py-3 font-bold text-sm"
+          style={{ background: 'linear-gradient(135deg,#C49020,#8B6010)', color: '#0E1726', border: 'none', cursor: 'pointer' }}>
+          إيه اللي أنا فيه ده 😭
+        </button>
+      </div>
+    );
+  }
+
+  // Fallback for unknown project tiles
+  return (
+    <div className="space-y-4 text-center" dir="rtl">
+      <div className="text-5xl">🏗️</div>
+      <h3 className="text-2xl font-extrabold text-gold-sheen">{tileName}</h3>
+      <p className="text-sm text-muted">مشروع تحت الإنشاء 👷</p>
+      <button onClick={() => onDone('done')}
+        className="w-full rounded-xl py-3 font-bold text-sm"
+        style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC', cursor: 'pointer' }}>
+        خلاص
+      </button>
     </div>
   );
 }
