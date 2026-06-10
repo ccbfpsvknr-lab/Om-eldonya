@@ -15,14 +15,15 @@ export function PlayerSetup() {
   const removePlayer = usePlayersStore((s) => s.removePlayer);
   const canStart    = usePlayersStore(selectCanStart);
   const setPhase    = useGameStore((s) => s.setPhase);
-  const maxPlayers  = useGameStore((s) => s.config.maxPlayers);
+  const mode        = useGameStore((s) => s.config.mode);
+  const maxPlayers  = mode === 'quick' ? 3 : 4;  // fast=3 classic=4
 
   const takenVehicles   = new Set(players.map((p) => p.vehicle));
   const availableVehicles = VEHICLES.filter((v) => !takenVehicles.has(v.emoji));
   const firstAvailable  = availableVehicles[0]?.emoji ?? VEHICLES[0].emoji;
   const [name, setName] = useState('');
   const [vehicle, setVehicle] = useState<string>(firstAvailable);
-  const full = players.length >= Math.min(maxPlayers, PLAYER_LIMITS.max);
+  const full = players.length >= maxPlayers;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -62,7 +63,7 @@ export function PlayerSetup() {
           اللاعبين
         </h1>
         <span className="rounded-xl border border-[rgba(56,74,110,0.5)] bg-[rgba(14,23,38,0.7)] px-3 py-1 text-xs text-[#9AA6BC]">
-          {players.length} / {Math.min(maxPlayers, PLAYER_LIMITS.max)}
+          {players.length} / {maxPlayers}
         </span>
       </div>
 
