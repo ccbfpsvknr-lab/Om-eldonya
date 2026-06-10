@@ -261,19 +261,13 @@ export function WinnerScreen() {
       </div>
 
       {/* ── Footer buttons ── */}
-      <div className="relative z-10 px-4 pt-3 pb-4 flex-shrink-0 flex gap-3">
+      <div className="relative z-10 px-4 pt-3 pb-4 flex-shrink-0">
         <button onClick={() => navigate(ROUTES.home)}
-          className="rounded-2xl py-3.5 transition-all active:scale-95"
-          style={{ flex: 1, background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)',
-            color: '#9AA6BC', fontFamily: "'Cairo', sans-serif", fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer' }}>
-          الرئيسية
-        </button>
-        <button onClick={playAgain}
-          className="rounded-2xl py-3.5 transition-all active:scale-[0.98]"
-          style={{ flex: 2, background: 'linear-gradient(135deg, #E8C040, #C49020)',
+          className="w-full rounded-2xl py-3.5 transition-all active:scale-95"
+          style={{ background: 'linear-gradient(135deg, #E8C040, #C49020)',
             color: '#0E1726', fontFamily: "'Cairo', sans-serif", fontSize: '1rem', fontWeight: 800,
             boxShadow: '0 4px 20px rgba(224,180,60,0.35)', border: 'none', cursor: 'pointer' }}>
-          نعيد؟ 🎲
+          الرئيسية 🏠
         </button>
       </div>
     </div>

@@ -708,7 +708,7 @@ export function GameBoard() {
               const tileBg = isCorner
                 ? (cornerInfo?.bg ?? '#120d06')
                 : tile.type === 'city'
-                  ? regionColor ? `linear-gradient(135deg, ${regionColor}25, ${regionColor}10)` : '#1a1208'
+                  ? regionColor ?? '#e8d5a0'
                   : '#faf5e8';
 
               // Road strip with lane markings + owner bar + vehicles
