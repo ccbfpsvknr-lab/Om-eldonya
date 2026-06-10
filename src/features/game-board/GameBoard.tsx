@@ -583,7 +583,8 @@ export function GameBoard() {
   // ── Board dimensions ──────────────────────────────────────────────────────
 
   // ── Board render ──────────────────────────────────────────────────────────
-  const isFastBoard = isFast && game.board.length === 16;
+  const isFastBoard    = isFast && game.board.length === 16;
+  const isClassicRect  = !isFastBoard && game.board.length === 24;
   const tilesPerSide = game.board.length / 4;
   const gridSize     = tilesPerSide + 1;
   const diceLabel    = diceRolling
@@ -593,16 +594,46 @@ export function GameBoard() {
     : '⚄ هات الزهر!';
 
   // Fast board uses 16:9 aspect; others use square
-  const boardWidth  = isFastBoard ? 'min(100dvw, calc(100dvh * 16 / 9))' : 'min(100dvw, 100dvh)';
-  const boardHeight = isFastBoard ? 'min(100dvh, calc(100dvw * 9 / 16))' : 'min(100dvw, 100dvh)';
-  const gridCols    = isFastBoard ? '2fr 1fr 1fr 1fr 1fr 2fr' : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
-  const gridRows    = isFastBoard ? '2fr 1fr 1fr 2fr'         : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
-  const centerCol   = isFastBoard ? '2 / 6' : `2 / ${gridSize}`;
-  const centerRow   = isFastBoard ? '2 / 4' : `2 / ${gridSize}`;
+  const boardWidth  = (isFastBoard || isClassicRect) ? 'min(100dvw, calc(100dvh * 16 / 9))' : 'min(100dvw, 100dvh)';
+  const boardHeight = (isFastBoard || isClassicRect) ? 'min(100dvh, calc(100dvw * 9 / 16))' : 'min(100dvw, 100dvh)';
+  const gridCols    = isFastBoard ? '2fr 1fr 1fr 1fr 1fr 2fr'
+                     : isClassicRect ? '2fr 1fr 1fr 1fr 1fr 1fr 1fr 2fr'
+                     : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
+  const gridRows    = isFastBoard ? '2fr 1fr 1fr 2fr'
+                     : isClassicRect ? '2fr 1fr 1fr 1fr 1fr 2fr'
+                     : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
+  const centerCol   = isFastBoard ? '2 / 6'
+                     : isClassicRect ? '2 / 8'
+                     : `2 / ${gridSize}`;
+  const centerRow   = isFastBoard ? '2 / 4'
+                     : isClassicRect ? '2 / 6'
+                     : `2 / ${gridSize}`;
 
-  const getGridPos  = (idx: number) => isFastBoard ? getTileGridPosFast(idx) : getTileGridPos(idx, game.board.length);
-  const getEdge     = (idx: number) => isFastBoard ? inwardEdgeFast(idx)     : inwardEdge(idx, game.board.length);
-  const isCornerTile= (idx: number) => isFastBoard
+  const getGridPosClassicRect = (idx: number): { col: string; row: string } => {
+    if (idx === 0)                   return { col: '1', row: '6' };  // BL Ramses
+    if (idx >= 1  && idx <= 6)       return { col: String(idx + 1), row: '6' }; // bottom
+    if (idx === 7)                   return { col: '8', row: '6' };  // BR Jail
+    if (idx >= 8  && idx <= 11)      return { col: '8', row: String(6 - (idx - 7)) }; // right
+    if (idx === 12)                  return { col: '8', row: '1' };  // TR Rest
+    if (idx >= 13 && idx <= 18)      return { col: String(8 - (idx - 12)), row: '1' }; // top
+    if (idx === 19)                  return { col: '1', row: '1' };  // TL Police
+    if (idx >= 20 && idx <= 23)      return { col: '1', row: String(idx - 18) }; // left
+    return { col: '1', row: '1' };
+  };
+  const getGridPos  = (idx: number) => isFastBoard ? getTileGridPosFast(idx)
+                     : isClassicRect ? getGridPosClassicRect(idx)
+                     : getTileGridPos(idx, game.board.length);
+  const inwardEdgeClassicRect = (idx: number) => {
+    if (idx <= 7)  return 'top'    as const;
+    if (idx <= 12) return 'left'   as const;
+    if (idx <= 19) return 'bottom' as const;
+    return             'right'     as const;
+  };
+  const getEdge     = (idx: number) => isFastBoard ? inwardEdgeFast(idx)
+                     : isClassicRect ? inwardEdgeClassicRect(idx)
+                     : inwardEdge(idx, game.board.length);
+  const isCornerTile= (idx: number) => isClassicRect ? [0,7,12,19].includes(idx)
+                     : isFastBoard
     ? (idx===0||idx===5||idx===8||idx===13)
     : (idx % tilesPerSide === 0);
 
@@ -838,7 +869,7 @@ export function GameBoard() {
               background: 'rgba(15, 8, 2, 0.90)' }}>
 
               {/* Mini Egyptian landscape */}
-              {(
+              {(true ||
                 <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden>
                   <defs>
                     <linearGradient id="csky" x1="0" y1="0" x2="0" y2="1">
@@ -861,14 +892,14 @@ export function GameBoard() {
 
               {/* Controls */}
               <div style={{ position: 'relative', zIndex: 5, height: '100%', display: 'flex',
-                flexDirection: isFastBoard ? 'row' : 'column',
-                padding: isFastBoard ? '6px' : '3px', gap: '4px', direction: 'rtl' }}>
+                flexDirection: (isFastBoard || isClassicRect) ? 'row' : 'column',
+                padding: (isFastBoard || isClassicRect) ? '6px' : '3px', gap: '4px', direction: 'rtl' }}>
 
                 {/* ── Left / Top section: current player + dice ── */}
                 <div style={{ flex: isFastBoard ? '0 0 60%' : 1, display: 'flex', flexDirection: 'column',
                   justifyContent: 'center', gap: isFastBoard ? '6px' : '2px' }}>
 
-                  {!isFastBoard && (
+                  {(!isFastBoard || isClassicRect) && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                       <h2 style={{ fontFamily: "'Rakkas', serif", fontSize: '9px',
                         background: 'linear-gradient(180deg, #F4CE5E, #E0B43C)',
