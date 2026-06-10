@@ -18,7 +18,7 @@ export const CHANCE_CARDS: ChanceCardDef[] = [
   // ---- Money ----
   { id: 'M1', type: 'money', title: '💵 بقشيش',           text: 'البواب بعتلك بقشيش!',                         amount: 500  },
   { id: 'M2', type: 'money', title: '⚡ فاتورة كهرباء',    text: 'الكهرباء فاجأتك بفاتورة 😤',                  amount: -300 },
-  { id: 'M3', type: 'money', title: '🎰 لوتو',             text: 'ربحت في اللوتو يا نجم!',                      amount: 1000 },
+  { id: 'M3', type: 'money', title: '🤝 راهنت',            text: 'راهنت صاحبك وكسبت!',                       amount: 1000 },
   { id: 'M4', type: 'money', title: '🚦 غرامة مرور',       text: 'الترافيك كتبلك مخالفة يا خرتيت 😂',          amount: -200 },
   { id: 'M5', type: 'money', title: '💼 مكافأة سنوية',     text: 'المدير راضي عنك... نادراً',                   amount: 800  },
   { id: 'M6', type: 'money', title: '🔧 إصلاح عربية',      text: 'العربية واقفة، ادفع إيه بقى! 🔧',             amount: -500 },

@@ -6,7 +6,7 @@ import {
 } from '@/game/engine';
 import { computeRegionOwners, getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
 import { canUpgrade, getUpgradeCost, stripRegionUpgrades } from '@/game/engine/upgradeEngine';
-import { buildShuffledDeck, getCard } from '@/game/data/chanceCards';
+import { getCard } from '@/game/data/chanceCards';
 
 const SALFA_AMOUNT = 2000;
 const TAX_AMOUNT = 500;
@@ -354,9 +354,12 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     const game = get().game;
     if (!game) return null;
 
-    let deck = [...game.chanceCardDeck];
-    if (deck.length === 0) deck = buildShuffledDeck();
-    const cardId = deck.shift()!;
+    // Infinite random pool — cards never deplete, every draw is fresh random
+    const isFast = game.mode === 'quick';
+    const FAST_POOL = ['M1','M2','M3','M4','M5','M6','M7','M8','V1','V2','V3','B2'];
+    const FULL_POOL = ['M1','M2','M3','M4','M5','M6','M7','M8','V1','V2','V3','P1','B1','B2','G1','G2','G3'];
+    const pool = isFast ? FAST_POOL : FULL_POOL;
+    const cardId = pool[Math.floor(Math.random() * pool.length)];
     const card = getCard(cardId);
 
     const idx = game.currentPlayerIndex;
@@ -367,24 +370,15 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         ...p, cash: p.cash + card.amount!,
         totalEarned: card.amount! > 0 ? p.totalEarned + card.amount! : p.totalEarned,
       } : p);
-      set({ game: { ...game, players, chanceCardDeck: deck } });
+      set({ game: { ...game, players } });
     } else if (card.type === 'bonus' && card.freePass) {
       players = players.map((p, i) => i === idx ? { ...p, hasRentFreePass: true } : p);
-      set({ game: { ...game, players, chanceCardDeck: deck } });
-    } else if (card.type === 'bonus' && card.rollAgain) {
-      // rollAgain is handled in component; just update deck
-      set({ game: { ...game, chanceCardDeck: deck } });
-    } else if (card.type === 'move') {
-      // Movement is handled in component (needs moveCurrentPlayer call)
-      set({ game: { ...game, chanceCardDeck: deck } });
-    } else if (card.type === 'police') {
-      set({ game: { ...game, chanceCardDeck: deck } });
+      set({ game: { ...game, players } });
     } else if (card.type === 'govt' && card.amount) {
       players = players.map((p, i) => i === idx ? { ...p, cash: p.cash + card.amount! } : p);
-      set({ game: { ...game, players, chanceCardDeck: deck } });
-    } else {
-      set({ game: { ...game, chanceCardDeck: deck } });
+      set({ game: { ...game, players } });
     }
+    // movement, rollAgain, police, skipNextTurn: handled in component
     return { cardId, effect: card.title };
   },
 

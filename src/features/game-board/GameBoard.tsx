@@ -118,7 +118,11 @@ export function GameBoard() {
 
   const [diceRolling, setDiceRolling]   = useState(false);
   const [diceDisplay, setDiceDisplay]   = useState<number | null>(null);
-  const [animPos, setAnimPos]           = useState<number | null>(null);
+  // Use a ref in addition to state — ref updates are sync so Zustand's
+  // useSyncExternalStore re-renders see the correct visual position immediately
+  const [, setAnimPosState]             = useState<number | null>(null);
+  const animPosRef                       = useRef<number | null>(null);
+  const setAnimPos = (v: number | null) => { animPosRef.current = v; setAnimPosState(v); };
   const [smokePos, setSmokePos]         = useState<number | null>(null);
   const [isMoving, setIsMoving]         = useState(false);
   const [lastRoll, setLastRoll]         = useState<number | null>(null);
@@ -202,18 +206,19 @@ export function GameBoard() {
   const isFast   = game.mode === 'quick';
   const phase    = game.phase;
   const isInJail = cp.jailTurns > 0;
-  const canRoll  = (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) && !isInJail && !diceRolling && !isMoving;
-  const canEnd   = phase === 'turn-end' && !isMoving && !isFast;
+  const canRoll      = (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) && !isInJail && !diceRolling && !isMoving;
+  const canDiceRoll  = (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) && !diceRolling && !isMoving;
+  const canEnd       = phase === 'turn-end' && !isMoving && !isFast;
   const myCities = Object.values(game.cities).filter((c) => c.ownerId === cp.id);
   const canUpgradeAny = !isFast && myCities.some((c) => canUpgrade(game, c, cp.id));
   const canTrade = !isFast && !game.tradeUsedThisTurn && game.players.filter((p) => p.isActive).length > 1;
 
   // Board visuals
-  const cpVisualPos = animPos !== null ? animPos : cp.position;
+  const cpVisualPos = animPosRef.current !== null ? animPosRef.current : cp.position;
   const occupantsByTile = new Map<number, Player[]>();
   game.players.forEach((p) => {
     if (!p.isActive) return;
-    const pos = p.id === cp.id && animPos !== null ? animPos : p.position;
+    const pos = p.id === cp.id && animPosRef.current !== null ? animPosRef.current : p.position;
     const arr = occupantsByTile.get(pos) ?? [];
     arr.push(p);
     occupantsByTile.set(pos, arr);
@@ -436,24 +441,23 @@ export function GameBoard() {
 
   // ── Unified roll handler ──────────────────────────────────────────────────
   const handleRoll = useCallback(() => {
-    if (diceRolling || isMoving || (!canRoll && !isInJail)) return;
+    if (!canDiceRoll || diceRolling || isMoving) return;
     const g = useMatchStore.getState().game;
     const before = g?.players[g.currentPlayerIndex];
     if (!before) return;
 
     setDiceRolling(true);
     setRollAgainPending(false);
-    const storeValue = isInJail ? null : rollDice();
-    const rollValue  = storeValue ?? Math.ceil(Math.random() * 6);
+    // Always call rollDice() — sets phase:'moving' which blocks re-rolling for both normal and jail turns
+    const storeValue = rollDice();
+    const rollValue  = storeValue ?? 1;
 
     diceRef.current = setInterval(() => setDiceDisplay(Math.ceil(Math.random() * 6)), 80);
     setTimeout(() => {
       clearInterval(diceRef.current!);
       setDiceDisplay(rollValue);
-      setLastRoll(rollValue);   // set immediately so dice face is correct when rolling stops
+      setLastRoll(rollValue);
       setDiceRolling(false);
-      // FIX jail loop: lock button during the 400ms gap before resolution fires
-      if (isInJail) setIsMoving(true);
 
       setTimeout(() => {
         if (isInJail) {
@@ -526,7 +530,6 @@ export function GameBoard() {
     : lastRoll !== null ? `${DICE_FACES[lastRoll]} ${lastRoll}`
     : isInJail ? '⚄ حاول تطلع!'
     : '⚄ هات الزهر!';
-  const canDiceRoll = canRoll || isInJail;
 
   // Fast board uses 16:9 aspect; others use square
   const boardWidth  = isFastBoard ? 'min(100dvw, calc(100dvh * 16 / 9))' : 'min(100dvw, 100dvh)';
