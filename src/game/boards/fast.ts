@@ -15,10 +15,10 @@ export const fastBoard: TileDef[] = [
   { type: 'city',   name: 'مرسى مطروح', groupId: 'q1' },      // 2
   { type: 'chance', name: 'فرصة' },                            // 3
   { type: 'city',   name: 'المنصورة',   groupId: 'q2' },      // 4
-  { type: 'jail',   name: 'السجن' },                           // 5  bottom-right corner
+  { type: 'jail',   name: 'الحجز' },                           // 5  bottom-right corner
   { type: 'city',   name: 'طنطا',        groupId: 'q2' },      // 6  right column ↑
   { type: 'city',   name: 'الأقصر',      groupId: 'q3' },      // 7
-  { type: 'police', name: 'روح السجن' },                      // 8  top-right corner
+  { type: 'police', name: 'كمين' },                      // 8  top-right corner
   { type: 'city',   name: 'أسوان',       groupId: 'q3' },      // 9  top row ←
   { type: 'city',   name: 'الغردقة',     groupId: 'q4' },      // 10
   { type: 'chance', name: 'فرصة' },                            // 11

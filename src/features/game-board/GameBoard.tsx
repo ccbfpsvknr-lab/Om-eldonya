@@ -71,9 +71,9 @@ const CITY_EMOJI: Record<string, string> = {
 
 const CORNER_STYLE: Record<string, { bg: string; icon: string; label: string }> = {
   ramses: { bg: 'linear-gradient(135deg, #1a3a08, #0d2005)', icon: '🏁', label: 'ابدأ' },
-  jail:   { bg: 'linear-gradient(135deg, #3a0a0a, #200606)', icon: '🔒', label: 'السجن' },
+  jail:   { bg: 'linear-gradient(135deg, #3a0a0a, #200606)', icon: '🔒', label: 'الحجز' },
   rest:   { bg: 'linear-gradient(135deg, #3a1a05, #221008)', icon: '☕', label: 'القهوة' },
-  police: { bg: 'linear-gradient(135deg, #3a0808, #1e0404)', icon: '🚔', label: 'بوليس' },
+  police: { bg: 'linear-gradient(135deg, #3a0808, #1e0404)', icon: '🚔', label: 'كمين' },
 };
 
 const SPECIAL_STYLE: Record<string, { border: string; icon: string }> = {
@@ -308,7 +308,7 @@ export function GameBoard() {
         <div className="text-center space-y-5">
           <div className="text-8xl">🚔</div>
           <h2 className="text-4xl font-extrabold text-gold-sheen">كلابوووش!</h2>
-          <p className="text-muted">السجن في الانتظار 🔒</p>
+          <p className="text-muted">يلا عالبوكس! 🚔</p>
           <Button block size="lg" onClick={() => close(pid)}>حاضر يا باشا 🫡</Button>
         </div>,
         { size: 'sm', hideClose: true, dismissable: false }
@@ -452,6 +452,8 @@ export function GameBoard() {
       setDiceDisplay(rollValue);
       setLastRoll(rollValue);   // set immediately so dice face is correct when rolling stops
       setDiceRolling(false);
+      // FIX jail loop: lock button during the 400ms gap before resolution fires
+      if (isInJail) setIsMoving(true);
 
       setTimeout(() => {
         if (isInJail) {
@@ -468,10 +470,12 @@ export function GameBoard() {
             2000
           );
           checkInsolvency(before.id);
+          setAnimPos(before.position); // lock visual before logical move
           movePlayer(rollValue);
           animateAndMove(before.position, rollValue, g!.board.length, 0);
         } else {
           const cashBefore = before.cash;
+          setAnimPos(before.position); // lock visual before logical move
           movePlayer(rollValue);
           const after = useMatchStore.getState().game?.players[g!.currentPlayerIndex];
           const salary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
@@ -617,7 +621,7 @@ export function GameBoard() {
                         <span key={o.id}
                           className={cn(!isMoving && isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
                           style={{
-                            fontSize: isFastBoard ? '14px' : '10px', lineHeight: 1,
+                            fontSize: isFastBoard ? '18px' : '13px', lineHeight: 1,
                             transform: isMoving && o.id === cp.id ? 'scale(1.4)' : 'scale(1)',
                             transition: 'transform 0.12s ease',
                             filter: o.id === cp.id
@@ -653,14 +657,14 @@ export function GameBoard() {
                       {occupants.length > 0 && (
                         <div style={{ display: 'flex', gap: '1px', marginBottom: '2px' }}>
                           {occupants.map((o) => (
-                            <span key={o.id} style={{ fontSize: isFastBoard ? '14px' : '10px',
+                            <span key={o.id} style={{ fontSize: isFastBoard ? '18px' : '13px',
                               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))', lineHeight: 1 }}>
                               {o.vehicle}
                             </span>
                           ))}
                         </div>
                       )}
-                      <div style={{ fontSize: isFastBoard ? '22px' : '15px', lineHeight: 1 }}>
+                      <div style={{ fontSize: isFastBoard ? '30px' : '20px', lineHeight: 1 }}>
                         {cpJailedHere ? '🔒' : cornerInfo?.icon ?? '👑'}
                       </div>
                       <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#EADBB7',
@@ -674,7 +678,7 @@ export function GameBoard() {
                       alignItems: 'center', justifyContent: 'space-between',
                       padding: '2px 1px', overflow: 'hidden', minWidth: 0 }}>
                       {/* Landmark */}
-                      <div style={{ fontSize: isFastBoard ? '20px' : '14px', lineHeight: 1, flexShrink: 0 }}>
+                      <div style={{ fontSize: isFastBoard ? '26px' : '17px', lineHeight: 1, flexShrink: 0 }}>
                         {landmark}
                       </div>
                       {/* Name */}
@@ -714,7 +718,7 @@ export function GameBoard() {
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'space-between',
                       padding: '2px 1px', overflow: 'hidden' }}>
-                      <div style={{ fontSize: isFastBoard ? '18px' : '13px', lineHeight: 1,
+                      <div style={{ fontSize: isFastBoard ? '22px' : '16px', lineHeight: 1,
                         filter: `drop-shadow(0 0 4px ${specialInfo?.border ?? 'rgba(224,180,60,0.4)'})` }}>
                         {specialInfo?.icon ?? '□'}
                       </div>
@@ -818,7 +822,7 @@ export function GameBoard() {
                           {cp.name}
                         </div>
                         <div style={{ fontSize: isFastBoard ? '9px' : '6px', color: '#9AA6BC', lineHeight: 1 }}>
-                          {isInJail ? '🔒 محبوس' : `خانة ${cpVisualPos}`}
+                          {isInJail ? '🔒 في الحجز' : `خانة ${cpVisualPos}`}
                         </div>
                       </div>
                       <div style={{ fontSize: isFastBoard ? '13px' : '8px', fontWeight: 800, color: cp.cash < 0 ? '#E05656' : '#E0B43C', fontFamily: 'monospace', lineHeight: 1 }}>

@@ -17,7 +17,7 @@ export const fullBoard: TileDef[] = [
   { type: 'chance',  name: 'فرصة' },                   // 7
   { type: 'city',    name: 'دمنهور',        groupId: 'f2' }, // 8
   { type: 'city',    name: 'دمياط',         groupId: 'f2' }, // 9
-  { type: 'jail',    name: 'السجن' },                  // 10
+  { type: 'jail',    name: 'الحجز' },                  // 10
   { type: 'city',    name: 'بورسعيد',       groupId: 'f3' }, // 11
   { type: 'project', name: 'شركة الكهرباء' },          // 12
   { type: 'city',    name: 'الإسماعيلية',   groupId: 'f3' }, // 13
@@ -37,7 +37,7 @@ export const fullBoard: TileDef[] = [
   { type: 'city',    name: 'المنيا',           groupId: 'f7' }, // 27
   { type: 'project', name: 'شركة المياه' },            // 28
   { type: 'city',    name: 'أسيوط',           groupId: 'f7' }, // 29
-  { type: 'police',  name: 'روح السجن' },             // 30
+  { type: 'police',  name: 'كمين' },             // 30
   { type: 'city',    name: 'سوهاج',           groupId: 'f7' }, // 31
   { type: 'city',    name: 'قنا',              groupId: 'f8' }, // 32
   { type: 'news',    name: 'أخبار' },                  // 33
