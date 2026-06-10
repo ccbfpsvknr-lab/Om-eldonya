@@ -62,6 +62,7 @@ export function createGame(params: CreateGameParams): Game {
     activeNewsEvent: null,
     newsRentMultiplier: 1,
     tradeUsedThisTurn: false,
+    hasUpgradedThisTurn: false,
     jailTileIndex,
     eliminatedOrder: [],
     statistics: createInitialStatistics(),

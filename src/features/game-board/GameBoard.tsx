@@ -9,7 +9,7 @@ import {
   selectGame, selectCurrentPlayer, SALFA_AMOUNT,
 } from '@/store';
 import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL } from '@/game/engine/upgradeEngine';
-import { isRegionComplete } from '@/game/engine/economyEngine';
+import { getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
 import { getCard } from '@/game/data/chanceCards';
 import type { City, Player } from '@/game/types';
 
@@ -53,10 +53,13 @@ function inwardEdgeFast(index: number): 'top' | 'right' | 'bottom' | 'left' | ''
 const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'] as const;
 
 const REGION_COLOR: Record<string, string> = {
-  q1:'#FF6B00', q2:'#00C853', q3:'#FF1744', q4:'#AA00FF', q5:'#0091EA',
-  a: '#FF6B00', b: '#00C853', c: '#FF1744', d: '#AA00FF', e: '#0091EA', f: '#FF6D9F',
-  f1:'#FF6B00', f2:'#00C853', f3:'#0091EA', f4:'#AA00FF',
-  f5:'#FF1744', f6:'#FF6D9F', f7:'#FF8F00', f8:'#00BFA5', f9:'#FFD600',
+  // Fast board regions
+  q1:'#F97316', q2:'#10B981', q3:'#EF4444', q4:'#8B5CF6', q5:'#3B82F6',
+  // Classic board regions — orange · emerald · red · violet · blue · amber
+  a: '#F97316', b: '#10B981', c: '#EF4444', d: '#8B5CF6', e: '#3B82F6', f: '#F59E0B',
+  // Full board regions
+  f1:'#F97316', f2:'#10B981', f3:'#3B82F6', f4:'#8B5CF6',
+  f5:'#EF4444', f6:'#EC4899', f7:'#F59E0B', f8:'#06B6D4', f9:'#84CC16',
 };
 
 const CITY_EMOJI: Record<string, string> = {
@@ -99,6 +102,7 @@ export function GameBoard() {
   const goToJail         = useMatchStore((s) => s.goToJail);
   const resolveJailTurn  = useMatchStore((s) => s.resolveJailTurn);
   const forfeitTurn      = useMatchStore((s) => s.forfeitTurn);
+  const applyNewsEvent   = useMatchStore((s) => s.applyNewsEvent);
   const decrementJailTurns = useMatchStore((s) => s.decrementJailTurns);
   const payTax           = useMatchStore((s) => s.payTax);
   const drawChance       = useMatchStore((s) => s.drawAndApplyChanceCard);
@@ -211,8 +215,13 @@ export function GameBoard() {
   const canDiceRoll  = (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) && !diceRolling && !isMoving;
   const canEnd       = phase === 'turn-end' && !isMoving && !isFast;
   const myCities = Object.values(game.cities).filter((c) => c.ownerId === cp.id);
-  const canUpgradeAny = !isFast && myCities.some((c) => canUpgrade(game, c, cp.id));
-  const canTrade = !isFast && !game.tradeUsedThisTurn && game.players.filter((p) => p.isActive).length > 1;
+  const canUpgradeAny = !isFast && !game.hasUpgradedThisTurn && myCities.some((c) => canUpgrade(game, c, cp.id));
+  const canSell  = myCities.length > 0 && (phase === 'rolling' || phase === 'turn-end') && !isMoving && !isFast;
+
+  
+// Dynamic currency emoji — scales with amount
+const cashEmoji = (n: number): string =>
+  n < 200 ? '🪙' : n < 800 ? '💵' : n < 3_000 ? '💰' : '💸';
 
   // Board visuals
   const cpVisualPos = animPosRef.current !== null ? animPosRef.current : cp.position;
@@ -300,7 +309,7 @@ export function GameBoard() {
               <div className="text-4xl mb-2">💸</div>
               <h3 className="text-xl text-gold-sheen">خلصوا فلوسك!</h3>
               <p className="mt-2 text-sm text-content">عشان أرض {owner?.name} في {city.name}</p>
-              <p className="mt-1 text-lg font-extrabold text-clay">−{tx.amount.toLocaleString('en-US')} جنيه</p>
+              <p className="mt-1 text-lg font-extrabold text-clay">{cashEmoji(tx.amount)}−{tx.amount.toLocaleString('en-US')}</p>
             </div>
           );
           checkInsolvency(player.id);
@@ -332,7 +341,7 @@ export function GameBoard() {
           <p className="text-sm leading-relaxed text-content whitespace-pre-line">{card.text}</p>
           {card.type === 'money' && card.amount && (
             <p className={cn('text-xl font-extrabold', card.amount > 0 ? 'text-gold' : 'text-clay')}>
-              {card.amount > 0 ? '+' : ''}{card.amount.toLocaleString('en-US')} جنيه
+              {card.amount > 0 ? '+' : ''}{cashEmoji(Math.abs(card.amount))}{card.amount.toLocaleString('en-US')}
             </p>
           )}
           <Button block size="lg" onClick={() => {
@@ -359,6 +368,28 @@ export function GameBoard() {
           </Button>
         </div>,
         { size: 'sm', dismissable: false, hideClose: true }
+      );
+
+    } else if (tile.type === 'news') {
+      const NEWS_POOL = [
+        { icon:'🛢️', title:'أسعار البنزين ولعت!',    sub:'كل واحد فيكم هيدفع ١٥٠ جنيه… يعني هتمشوا على رجليكم من دلوقتي 😭',  effect:'allPay',            amount:150 },
+        { icon:'📈', title:'البورصة في الطالع!',       sub:'الأغنى واحد يكسب ٦٠٠ جنيه… المستثمرين بيعيطوا من الفرحة 🤑',       effect:'richestGain',       amount:600 },
+        { icon:'📉', title:'أزمة اقتصادية يا جماعة!', sub:'الجنيه وقع في الأرض وبص للسما… كل لاعب يدفع ١٠٪ من رصيده 😩',     effect:'allPayPercent',     amount:10  },
+        { icon:'💰', title:'الحكومة رفعت الأجور!',    sub:'ربنا يكرّمهم… كل لاعب يكسب ٢٠٠ جنيه مكافأة 😁',                    effect:'allGain',           amount:200 },
+        { icon:'🏗️', title:'فساد في المناقصات!',      sub:'القضية مش هتكمل بكره… الأغنى يدفع ٥٠٠ للأفقر 😂',                  effect:'richestPaysPoarest',amount:500 },
+        { icon:'⚡', title:'الكهربا اتقطعت على الحي!', sub:'خير إن شاء الله… مفيش إيجار عليك الدور الجاي 😅',                  effect:'rentFree',          amount:0   },
+        { icon:'💵', title:'الدولار وصل مش كدا كدا!', sub:'ادعوا على اللي يستاهل… كل لاعب يدفع ٥٪ من رصيده 😤',              effect:'allPayPercent',     amount:5   },
+        { icon:'🎉', title:'يوم عطلة مفاجأة!',        sub:'الدولة كريمة لما بتحب… كل لاعب يكسب ٣٠٠ جنيه 😁',                  effect:'allGain',           amount:300 },
+      ];
+      const ev = NEWS_POOL[Math.floor(Math.random() * NEWS_POOL.length)];
+      applyNewsEvent(ev.effect, ev.amount);
+      showToast(
+        <div className="text-center space-y-2" dir="rtl">
+          <div className="text-5xl">{ev.icon}</div>
+          <h3 className="text-xl font-extrabold text-gold-sheen">{ev.title}</h3>
+          <p className="text-sm text-content leading-relaxed">{ev.sub}</p>
+        </div>,
+        2800
       );
 
     } else if (tile.type === 'rest') {
@@ -407,12 +438,12 @@ export function GameBoard() {
       } else if (tile.name === 'شركة المياه') {
         const bill = 150;
         payAmount(bill);
-        showToast(<div className="text-center"><div className="text-4xl mb-2">💧</div><h3 className="text-xl text-gold-sheen">شركة المياه</h3><p className="text-sm text-content mt-1">وصلتك فاتورة المياه يا أخي!</p><p className="text-lg font-extrabold text-clay mt-1">−{bill.toLocaleString('en-US')} جنيه</p></div>);
+        showToast(<div className="text-center"><div className="text-4xl mb-2">💧</div><h3 className="text-xl text-gold-sheen">شركة المياه</h3><p className="text-sm text-content mt-1">وصلتك فاتورة المياه يا أخي!</p><p className="text-lg font-extrabold text-clay mt-1">−{cashEmoji(bill)}{bill.toLocaleString('en-US')}</p></div>);
         checkInsolvency(player.id);
       } else if (tile.name === 'شركة الكهرباء') {
         const bill = Math.min(Math.max(Math.round(player.cash * 0.10), 200), 2000);
         payAmount(bill);
-        showToast(<div className="text-center"><div className="text-4xl mb-2">⚡</div><h3 className="text-xl text-gold-sheen">شركة الكهرباء</h3><p className="text-sm text-content mt-1">فاتورتك وصلت… وده اللي أنت فيه 😬</p><p className="text-lg font-extrabold text-clay mt-1">−{bill.toLocaleString('en-US')} جنيه</p></div>);
+        showToast(<div className="text-center"><div className="text-4xl mb-2">⚡</div><h3 className="text-xl text-gold-sheen">شركة الكهرباء</h3><p className="text-sm text-content mt-1">فاتورتك وصلت… وده اللي أنت فيه 😬</p><p className="text-lg font-extrabold text-clay mt-1">−{cashEmoji(bill)}{bill.toLocaleString('en-US')}</p></div>);
         checkInsolvency(player.id);
       } else if (tile.name === 'المحكمة الاقتصادية') {
         const activePlayers = g.players.filter(p => p.isActive);
@@ -515,7 +546,7 @@ export function GameBoard() {
                 <p className="text-sm text-content mt-1">
                   {rollValue === 6
                     ? 'خروج مجاني! 🎉'
-                    : `ادفع ${fee.toLocaleString('en-US')} وامشي 😅`}
+                    : `ادفع ${cashEmoji(fee)}${fee.toLocaleString('en-US')} وامشي 😅`}
                 </p>
                 <p className="text-sm font-bold text-teal mt-1">يلا طلعت برة 🏃</p>
               </div>,
@@ -559,19 +590,11 @@ export function GameBoard() {
     );
   };
 
-  // ── Trade modal ───────────────────────────────────────────────────────────
-  const openTradeModal = () => {
-    const partners = game.players.filter((p) => p.isActive && p.id !== cp.id);
-    const tid = open(
-      <TradeModal currentPlayerId={cp.id} partners={partners}
-        onTrade={(toId, oC, oX, rC, rX) => {
-          executeTrade(cp.id, toId, oC, oX, rC, rX);
-          close(tid);
-          showToast(<div className="text-center"><div className="text-4xl mb-2">🤝</div><h3 className="text-xl text-gold-sheen">الصفقة اتمت!</h3></div>, 1600);
-        }}
-        onClose={() => close(tid)}
-      />,
-      { title: '🤝 التداول', size: 'lg' }
+  // ── Sell to bank modal ────────────────────────────────────────────────────
+  const openSellModal = () => {
+    const sid = open(
+      <SellToBankModal currentPlayerId={cp.id} onClose={() => close(sid)} />,
+      { size: 'sm' }
     );
   };
 
@@ -594,8 +617,12 @@ export function GameBoard() {
     : '⚄ هات الزهر!';
 
   // Fast board uses 16:9 aspect; others use square
-  const boardWidth  = (isFastBoard || isClassicRect) ? 'min(100dvw, calc(100dvh * 16 / 9))' : 'min(100dvw, 100dvh)';
-  const boardHeight = (isFastBoard || isClassicRect) ? 'min(100dvh, calc(100dvw * 9 / 16))' : 'min(100dvw, 100dvh)';
+  // Board grid natural fr totals — used to compute the "contain" size for any screen
+  const gridFrW = isFastBoard ? 8 : isClassicRect ? 10 : (tilesPerSide * 2);
+  const gridFrH = isFastBoard ? 6 : isClassicRect ? 8  : (tilesPerSide * 2);
+  // min(screenW, screenH × W/H)  →  fits the larger screen dimension, centers on the smaller
+  const boardWidth  = `min(100dvw, calc(100dvh * ${gridFrW} / ${gridFrH}))`;
+  const boardHeight = `min(100dvh, calc(100dvw * ${gridFrH} / ${gridFrW}))`;
   const gridCols    = isFastBoard ? '2fr 1fr 1fr 1fr 1fr 2fr'
                      : isClassicRect ? '2fr 1fr 1fr 1fr 1fr 1fr 1fr 2fr'
                      : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
@@ -657,6 +684,7 @@ export function GameBoard() {
             }}>
 
             {/* ── Perimeter tiles ── */}
+            {/* Vehicle direction based on which edge the road strip is on */}
             {game.board.map((tile) => {
               const { col, row }  = getGridPos(tile.index);
               const edge          = getEdge(tile.index);
@@ -674,7 +702,7 @@ export function GameBoard() {
               const roadFirst     = edge === 'top' || edge === 'left';
               const cornerInfo    = isCorner ? CORNER_STYLE[tile.type] : null;
               const specialInfo   = SPECIAL_STYLE[tile.type];
-              const ROAD_PCT      = isHoriz ? 30 : 32;
+              const ROAD_PCT      = isHoriz ? (isFastBoard || isClassicRect ? 30 : 28) : (isFastBoard || isClassicRect ? 32 : 30);
               const isOwned       = ownerColor !== undefined;
               const fmt           = (n: number) => n.toLocaleString('en-US');
 
@@ -725,20 +753,29 @@ export function GameBoard() {
                   {occupants.length > 0 && (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex',
                       alignItems: 'center', justifyContent: 'center', zIndex: 15 }}>
-                      {occupants.map((o) => (
-                        <span key={o.id}
-                          className={cn(!isMoving && isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
-                          style={{
-                            fontSize: isFastBoard ? '18px' : '13px', lineHeight: 1,
-                            transform: isMoving && o.id === cp.id ? 'scale(1.4)' : 'scale(1)',
-                            transition: 'transform 0.12s ease',
-                            filter: o.id === cp.id
-                              ? 'drop-shadow(0 0 5px rgba(224,180,60,0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.9))'
-                              : 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
-                          }}>
-                          {o.vehicle}
-                        </span>
-                      ))}
+                      {occupants.map((o) => {
+                        // Rotate vehicle emoji based on movement direction
+                        const dirDeg = edge === 'top'    ?   0   // bottom row → right
+                                     : edge === 'left'   ? -90   // right col ↑ up
+                                     : edge === 'bottom' ? 180   // top row ← left
+                                     :                     90;   // left col ↓ down
+                        const scl = isMoving && o.id === cp.id ? 1.4 : 1;
+                        return (
+                          <span key={o.id}
+                            className={cn(!isMoving && isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
+                            style={{
+                              fontSize: (isFastBoard || isClassicRect) ? '18px' : '13px', lineHeight: 1,
+                              display: 'inline-block',
+                              transform: `rotate(${dirDeg}deg) scale(${scl})`,
+                              transition: 'transform 0.12s ease',
+                              filter: o.id === cp.id
+                                ? 'drop-shadow(0 0 5px rgba(224,180,60,0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.9))'
+                                : 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
+                            }}>
+                            {o.vehicle}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -765,17 +802,17 @@ export function GameBoard() {
                       {occupants.length > 0 && (
                         <div style={{ display: 'flex', gap: '1px', marginBottom: '2px' }}>
                           {occupants.map((o) => (
-                            <span key={o.id} style={{ fontSize: isFastBoard ? '18px' : '13px',
+                            <span key={o.id} style={{ fontSize: (isFastBoard || isClassicRect) ? '18px' : '13px',
                               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))', lineHeight: 1 }}>
                               {o.vehicle}
                             </span>
                           ))}
                         </div>
                       )}
-                      <div style={{ fontSize: isFastBoard ? '30px' : '20px', lineHeight: 1 }}>
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '30px' : '20px', lineHeight: 1 }}>
                         {cpJailedHere ? '🔒' : cornerInfo?.icon ?? '👑'}
                       </div>
-                      <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#1a0d04',
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '9px' : '7.5px', color: '#1a0d04',
                         fontFamily: "'Cairo'", fontWeight: 700, textAlign: 'center', direction: 'rtl', lineHeight: 1.2 }}>
                         {cpJailedHere ? 'محبوس' : cornerInfo?.label ?? tile.name}
                       </div>
@@ -786,51 +823,50 @@ export function GameBoard() {
                       alignItems: 'center', justifyContent: 'space-between',
                       padding: '2px 1px', overflow: 'hidden', minWidth: 0 }}>
                       {/* Landmark */}
-                      <div style={{ fontSize: isFastBoard ? '26px' : '17px', lineHeight: 1, flexShrink: 0 }}>
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '26px' : '17px', lineHeight: 1, flexShrink: 0 }}>
                         {landmark}
                       </div>
                       {/* Name */}
-                      <div style={{ fontSize: isFastBoard ? '11px' : '8.5px', fontWeight: 800, color: '#1a0d04',
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '11px' : '8.5px', fontWeight: 800, color: '#1a0d04',
                         fontFamily: "'Cairo'", textAlign: 'center', direction: 'rtl', lineHeight: 1.1,
                         overflow: 'hidden', maxWidth: '100%', flexShrink: 0 }}>
                         {tile.name}
                       </div>
-                      {/* Price + Rent (or just Rent if owned) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
-                        {!isOwned ? (
-                          <>
-                            <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#7a4800',
-                              lineHeight: 1, fontFamily: 'monospace', fontWeight: 700 }}>
-                              🪙{fmt(city?.price ?? 0)}
-                            </div>
-                            <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#9a0030',
-                              lineHeight: 1, fontFamily: 'monospace' }}>
-                              🏠{city?.baseRent ?? 0}
-                            </div>
-                          </>
-                        ) : (
-                          <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#9a0030',
-                            lineHeight: 1, fontFamily: 'monospace', fontWeight: 800 }}>
-                            🏠{city?.baseRent ?? 0}
+                      {/* Price + Live Rent */}
+                      {(() => {
+                        const liveRent = city ? getCityRent(game, city) : 0;
+                        const fs  = (isFastBoard || isClassicRect) ? '9px' : '7px';
+                        const fsS = (isFastBoard || isClassicRect) ? '8px' : '6px';
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
+                            {!isOwned ? (
+                              <>
+                                <div style={{ fontSize: fs, color: '#7a4800', lineHeight: 1, fontFamily: 'monospace', fontWeight: 700 }}>
+                                  {cashEmoji(city?.price ?? 0)}{fmt(city?.price ?? 0)}
+                                </div>
+                                <div style={{ fontSize: fsS, color: '#9a0030', lineHeight: 1, fontFamily: 'monospace' }}>
+                                  {cashEmoji(liveRent)}{liveRent}
+                                </div>
+                              </>
+                            ) : (
+                              <div style={{ fontSize: fs, color: '#9a0030', lineHeight: 1, fontFamily: 'monospace', fontWeight: 800 }}>
+                                {cashEmoji(liveRent)}{liveRent}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {upgradeLevel > 0 && (
-                          <div style={{ fontSize: '6px', color: '#E0B43C', lineHeight: 1 }}>
-                            {'★'.repeat(upgradeLevel)}
-                          </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
 
                   ) : (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'space-between',
                       padding: '2px 1px', overflow: 'hidden' }}>
-                      <div style={{ fontSize: isFastBoard ? '22px' : '16px', lineHeight: 1,
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '22px' : '16px', lineHeight: 1,
                         filter: `drop-shadow(0 0 4px ${specialInfo?.border ?? 'rgba(224,180,60,0.4)'})` }}>
                         {specialInfo?.icon ?? '□'}
                       </div>
-                      <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#3a2a08',
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '8px' : '6.5px', color: '#3a2a08',
                         textAlign: 'center', direction: 'rtl', lineHeight: 1.1, overflow: 'hidden' }}>
                         {tile.name}
                       </div>
@@ -842,9 +878,15 @@ export function GameBoard() {
 
                   {/* Upgrade dots */}
                   {upgradeLevel > 0 && (
-                    <div style={{ position: 'absolute', top: 1, left: 1, display: 'flex', gap: '1px', zIndex: 8 }}>
-                      {Array.from({ length: upgradeLevel }).map((_, i) => (
-                        <div key={i} style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#E0B43C' }}/>
+                    <div style={{ position: 'absolute', top: 1, right: 1, zIndex: 9,
+                      display: 'flex', gap: '0px', lineHeight: 1 }}>
+                      {Array.from({ length: Math.min(upgradeLevel, MAX_UPGRADE_LEVEL) }).map((_, i) => (
+                        <span key={i} style={{
+                          fontSize: (isFastBoard || isClassicRect) ? '10px' : '8px',
+                          color: '#FFD700',
+                          textShadow: '0 0 4px rgba(255,200,0,0.9), 0 1px 2px rgba(0,0,0,0.9)',
+                          lineHeight: 1,
+                        }}>★</span>
                       ))}
                     </div>
                   )}
@@ -888,7 +930,7 @@ export function GameBoard() {
               )}
 
               {/* Dark overlay for non-fast */}
-              {!isFastBoard && <div style={{ position: 'absolute', inset: 0, background: 'rgba(6,4,2,0.7)', zIndex: 1 }}/>}
+              {!isFastBoard && !isClassicRect && <div style={{ position: 'absolute', inset: 0, background: 'rgba(6,4,2,0.7)', zIndex: 1 }}/>}
 
               {/* Controls */}
               <div style={{ position: 'relative', zIndex: 5, height: '100%', display: 'flex',
@@ -896,7 +938,7 @@ export function GameBoard() {
                 padding: (isFastBoard || isClassicRect) ? '6px' : '3px', gap: '4px', direction: 'rtl' }}>
 
                 {/* ── Left / Top section: current player + dice ── */}
-                <div style={{ flex: isFastBoard ? '0 0 60%' : 1, display: 'flex', flexDirection: 'column',
+                <div style={{ flex: (isFastBoard || isClassicRect) ? '0 0 60%' : 1, display: 'flex', flexDirection: 'column',
                   justifyContent: 'center', gap: isFastBoard ? '6px' : '2px' }}>
 
                   {(!isFastBoard || isClassicRect) && (
@@ -922,7 +964,7 @@ export function GameBoard() {
                   <div style={{ borderRadius: '6px',
                     border: `1px solid rgba(224,180,60,${isFastBoard?'0.5':'0.3'})`,
                     background: `rgba(22,15,4,${isFastBoard?'0.75':'0.85'})`,
-                    padding: isFastBoard ? '8px' : '4px', flexShrink: 0 }}>
+                    padding: (isFastBoard || isClassicRect) ? '8px' : '4px', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ fontSize: isFastBoard ? '20px' : '14px' }}>{cp.vehicle}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -989,13 +1031,13 @@ export function GameBoard() {
                       </button>
                     </div>
 
-                    {(canEnd || canUpgradeAny || canTrade) && (
+                    {(canEnd || canUpgradeAny || canSell) && (
                       <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>
                         {canUpgradeAny && (
                           <button onClick={openUpgradeModal} style={{ flex: 1, borderRadius: '5px', padding: isFastBoard?'5px':'2px', fontSize: isFastBoard?'10px':'7px', fontWeight: 700, background: 'rgba(42,157,143,0.15)', border: '1px solid rgba(42,157,143,0.4)', color: '#2A9D8F', cursor: 'pointer' }}>🏗️ رقّي</button>
                         )}
-                        {canTrade && (
-                          <button onClick={openTradeModal} style={{ flex: 1, borderRadius: '5px', padding: isFastBoard?'5px':'2px', fontSize: isFastBoard?'10px':'7px', fontWeight: 700, background: 'rgba(56,74,110,0.3)', border: '1px solid rgba(56,74,110,0.5)', color: '#9AA6BC', cursor: 'pointer' }}>🤝 تداول</button>
+                        {canSell && (
+                          <button onClick={openSellModal} style={{ flex: 1, borderRadius: '5px', padding: (isFastBoard||isClassicRect)?'5px':'2px', fontSize: (isFastBoard||isClassicRect)?'10px':'7px', fontWeight: 700, background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)', color: '#C75B39', cursor: 'pointer' }}>🏦 بيع للبنك</button>
                         )}
                         {canEnd && (
                           <button onClick={handleEndTurn} style={{ flex: 1, borderRadius: '5px', padding: isFastBoard?'5px':'2px', fontSize: isFastBoard?'10px':'7px', fontWeight: 700, background: 'rgba(224,180,60,0.15)', border: '1px solid rgba(224,180,60,0.4)', color: '#E0B43C', cursor: 'pointer' }}>يلا ←</button>
@@ -1018,7 +1060,7 @@ export function GameBoard() {
                 </div>
 
                 {/* ── Right / Bottom section: leaderboard ── */}
-                <div style={{ flex: isFastBoard ? '0 0 40%' : 1, display: 'flex', flexDirection: 'column',
+                <div style={{ flex: (isFastBoard || isClassicRect) ? '0 0 40%' : 1, display: 'flex', flexDirection: 'column',
                   borderRadius: '6px',
                   border: `1px solid rgba(56,74,110,${isFastBoard?'0.4':'0.3'})`,
                   background: `rgba(14,10,4,${isFastBoard?'0.75':'0.8'})`,
@@ -1029,7 +1071,7 @@ export function GameBoard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: isFastBoard?'5px':'3px', overflow: 'hidden' }}>
                     {sortedPlayers.map((p, i) => {
                       const cashStr = p.isActive
-                        ? p.cash.toLocaleString('en-US')
+                        ? `${cashEmoji(Math.abs(p.cash))}${p.cash.toLocaleString('en-US')}`
                         : '💀';
                       return (
                         <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '3px',
@@ -1037,13 +1079,13 @@ export function GameBoard() {
                           background: p.id===cp.id ? 'rgba(224,180,60,0.15)' : 'rgba(255,255,255,0.03)',
                           border: p.id===cp.id ? '1px solid rgba(224,180,60,0.25)' : '1px solid transparent',
                           opacity: p.isActive ? 1 : 0.4 }}>
-                          <span style={{ fontSize: isFastBoard?'15px':'11px', lineHeight: 1, flexShrink: 0 }}>{p.vehicle}</span>
+                          <span style={{ fontSize: (isFastBoard||isClassicRect)?'15px':'11px', lineHeight: 1, flexShrink: 0 }}>{p.vehicle}</span>
                           <span style={{ flex: 1, fontSize: isFastBoard?'11px':'7px', color: p.id===cp.id?'#F4CE5E':'#EADBB7',
                             fontFamily: "'Cairo'", fontWeight: 700,
                             overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                             {p.name}
                           </span>
-                          {p.jailTurns > 0 && <span style={{ fontSize: isFastBoard?'9px':'7px', flexShrink: 0 }}>🔒</span>}
+                          {p.jailTurns > 0 && <span style={{ fontSize: (isFastBoard||isClassicRect)?'9px':'7px', flexShrink: 0 }}>🔒</span>}
                           <span style={{ fontSize: isFastBoard?'11px':'7px', fontWeight: 800,
                             color: p.cash<0?'#E05656':'#E0B43C', fontFamily: 'monospace', lineHeight: 1, flexShrink: 0 }}>
                             {cashStr}
@@ -1092,7 +1134,7 @@ function BuyCityModal({ city, canAfford, onBuy, onPass }: {
       {/* Stats */}
       <div style={{ display: 'flex', borderBottom: `1px solid rgba(56,74,110,0.3)` }}>
         {[
-          { label: 'التمن', value: city.price.toLocaleString('en-US'), color: regionColor, icon: '🪙' },
+          { label: 'التمن', value: city.price.toLocaleString('en-US'), color: regionColor, icon: cashEmoji(city.price) },
           { label: 'الإيجار', value: city.baseRent.toLocaleString('en-US'), color: '#C75B39', icon: '🏠' },
           { label: 'لو كملت', value: (city.baseRent * 2).toLocaleString('en-US'), color: '#2A9D8F', icon: '🏠🏠' },
         ].map(({ label, value, color, icon }) => (
@@ -1382,7 +1424,7 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
       )}
       {ownedCities.length > 0 && (
         <div className="space-y-2">
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#9AA6BC', fontFamily: "'Cairo'" }}>بيع اللي عندك بنص التمن:</p>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#9AA6BC', fontFamily: "'Cairo'" }}>بيع اللي عندك بـ ٧٥٪ من التمن:</p>
           {ownedCities.map((c) => {
             const rc = REGION_COLOR[c.region] ?? '#E0B43C';
             const lm = CITY_EMOJI[c.name] ?? '🏙️';
@@ -1395,7 +1437,7 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
                   {lm} {c.name}
                 </span>
                 <span style={{ color: '#27AE60', fontWeight: 800, fontFamily: 'monospace' }}>
-                  +{Math.round(c.price * 0.5).toLocaleString('en-US')}
+                  {cashEmoji(Math.round(c.price * 0.75))}+{Math.round(c.price * 0.75).toLocaleString('en-US')}
                 </span>
               </button>
             );
@@ -1477,7 +1519,7 @@ function GovOfficeModal({ tileName, player, allPlayers, onDone, payAmount, trans
           وصلتك فاتورة المياه يا أخي!<br/>
           وماعدش فيه كلام 😶
         </p>
-        <p className="text-xl font-extrabold text-clay">−{bill.toLocaleString('en-US')} جنيه</p>
+        <p className="text-xl font-extrabold text-clay">{cashEmoji(bill)}−{bill.toLocaleString('en-US')}</p>
         <button onClick={() => { payAmount(bill); checkInsolvency(player.id); onDone('paid'); }}
           className="w-full rounded-xl py-3 font-bold text-sm"
           style={{ background: 'linear-gradient(135deg,#1E6FA0,#155080)', color: '#fff', border: 'none', cursor: 'pointer' }}>
@@ -1547,7 +1589,7 @@ function GovOfficeModal({ tileName, player, allPlayers, onDone, payAmount, trans
           فاتورتك وصلت… وده اللي أنت فيه 😬<br/>
           ١٠٪ من رصيدك
         </p>
-        <p className="text-xl font-extrabold text-clay">−{bill.toLocaleString('en-US')} جنيه</p>
+        <p className="text-xl font-extrabold text-clay">{cashEmoji(bill)}−{bill.toLocaleString('en-US')}</p>
         <button onClick={() => { payAmount(bill); checkInsolvency(player.id); onDone('paid'); }}
           className="w-full rounded-xl py-3 font-bold text-sm"
           style={{ background: 'linear-gradient(135deg,#C49020,#8B6010)', color: '#0E1726', border: 'none', cursor: 'pointer' }}>
@@ -1567,6 +1609,89 @@ function GovOfficeModal({ tileName, player, allPlayers, onDone, payAmount, trans
         className="w-full rounded-xl py-3 font-bold text-sm"
         style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC', cursor: 'pointer' }}>
         خلاص
+      </button>
+    </div>
+  );
+}
+
+// ─── SELL TO BANK MODAL ──────────────────────────────────────────────────────
+function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string; onClose: () => void }) {
+  const game                  = useMatchStore(selectGame);
+  const sellCity              = useMatchStore((s) => s.sellCity);
+  const downgradeCityUpgrade  = useMatchStore((s) => s.downgradeCityUpgrade);
+  if (!game) return null;
+
+  const ownedCities = Object.values(game.cities).filter((c) => c.ownerId === currentPlayerId);
+
+  return (
+    <div className="space-y-4" dir="rtl">
+      <div className="text-center">
+        <div className="text-5xl mb-1">🏦</div>
+        <h3 className="text-2xl font-extrabold text-gold-sheen">بيع للبنك</h3>
+        <p className="text-sm text-muted mt-1">٧٥٪ من سعر الشراء — للمدينة والترقيات</p>
+      </div>
+
+      {ownedCities.length === 0 ? (
+        <p className="text-center text-muted text-sm py-4">مفيش مدن عندك دلوقتي 😅</p>
+      ) : (
+        <div className="space-y-3">
+          {ownedCities.map((c) => {
+            const rc          = REGION_COLOR[c.region] ?? '#E0B43C';
+            const cityPrice   = Math.round(c.price * 0.75);
+            const upgradeRefund = c.level > 0 ? Math.round(c.price * 0.15 * 0.75) : 0;
+            return (
+              <div key={c.id} style={{ borderRadius: '12px', border: `1px solid ${rc}40`, background: `${rc}10`, overflow: 'hidden' }}>
+                {/* Sell whole city */}
+                <button onClick={() => sellCity(c.id)}
+                  className="w-full flex items-center justify-between transition-all"
+                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: c.level > 0 ? `1px solid ${rc}20` : 'none', background: 'transparent' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '16px' }}>{CITY_EMOJI[c.name] ?? '🏙️'}</span>
+                    <span style={{ color: '#EADBB7', fontWeight: 700, fontFamily: "'Cairo'", fontSize: '0.9rem' }}>{c.name}</span>
+                    {c.level > 0 && (
+                      <span style={{ color: '#FFD700', fontSize: '10px', letterSpacing: '-1px' }}>{'★'.repeat(c.level)}</span>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ color: '#27AE60', fontWeight: 800, fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                      {cashEmoji(cityPrice)}+{cityPrice.toLocaleString('en-US')}
+                    </div>
+                    {c.level > 0 && (
+                      <div style={{ color: '#9AA6BC', fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                        +{(Math.round(c.price * 0.15 * 0.75) * c.level).toLocaleString('en-US')} ترقيات
+                      </div>
+                    )}
+                    <div style={{ color: '#9AA6BC', fontSize: '0.65rem', fontFamily: "'Cairo'" }}>بيع المدينة كاملة</div>
+                  </div>
+                </button>
+
+                {/* Sell one upgrade level */}
+                {c.level > 0 && (
+                  <button onClick={() => downgradeCityUpgrade(c.id)}
+                    className="w-full flex items-center justify-between transition-all"
+                    style={{ padding: '8px 14px', cursor: 'pointer', background: 'transparent' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: '#FFD700', fontSize: '13px' }}>★</span>
+                      <span style={{ color: '#EADBB7', fontFamily: "'Cairo'", fontSize: '0.85rem' }}>بيع ترقية واحدة</span>
+                      <span style={{ color: '#9AA6BC', fontSize: '0.75rem' }}>
+                        ({c.level} → {c.level - 1})
+                      </span>
+                    </div>
+                    <span style={{ color: '#2A9D8F', fontWeight: 800, fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                      {cashEmoji(upgradeRefund)}+{upgradeRefund.toLocaleString('en-US')}
+                    </span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button onClick={onClose}
+        className="w-full rounded-xl py-3 text-sm font-bold"
+        style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.5)', color: '#9AA6BC', cursor: 'pointer' }}>
+        إلغاء
       </button>
     </div>
   );

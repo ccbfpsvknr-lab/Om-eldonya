@@ -50,6 +50,8 @@ interface MatchState {
   setWinner: (playerId: string | null) => void;
   /** Roll dice in jail: pay 2% (if 6) or 4% of starting cash, always frees player. */
   forfeitTurn: () => void;
+  downgradeCityUpgrade: (cityId: string) => number;
+  applyNewsEvent: (effect: string, amount: number) => void;
   resolveJailTurn: (diceValue: number) => number;
   payAmount: (amount: number) => number;
   transferBetweenPlayers: (fromId: string, toId: string, amount: number) => void;
@@ -176,6 +178,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         activeNewsEvent, newsRentMultiplier,
         dice: { ...game.dice, value: null, rolling: false },
         tradeUsedThisTurn: false,
+        hasUpgradedThisTurn: false,
       },
       pendingNewsEvent,
     };
@@ -243,7 +246,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     if (player.cash < cost) return s;
     const players = game.players.map((p, i) => i === idx ? { ...p, cash: p.cash - cost } : p);
     const cities = { ...game.cities, [cityId]: { ...city, level: city.level + 1 } };
-    return { game: { ...game, players, cities } };
+    return { game: { ...game, players, cities, hasUpgradedThisTurn: true } };
   }),
 
   sellCity: (cityId) => {
@@ -257,10 +260,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     const { updatedCities, refund } = stripRegionUpgrades(
       { ...game.cities, [cityId]: { ...city, level: 0 } },
       city.region,
-      player.id
+      player.id,
     );
 
-    const salePrice = Math.round(city.price * 0.5);
+    const salePrice = Math.round(city.price * 0.75);
     const totalGain = salePrice + refund;
 
     const releasedCities = {
@@ -442,6 +445,61 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       statistics: { ...s.game.statistics, finishedAt: Date.now() },
     }
   } : s),
+
+  applyNewsEvent: (effect, amount) => {
+    const g = get().game;
+    if (!g) return;
+    const active = g.players.filter(p => p.isActive);
+    const idx    = g.currentPlayerIndex;
+    let players  = [...g.players];
+    switch (effect) {
+      case 'allPay':
+        players = players.map(p => p.isActive ? { ...p, cash: p.cash - amount } : p);
+        break;
+      case 'allGain':
+        players = players.map(p => p.isActive ? { ...p, cash: p.cash + amount } : p);
+        break;
+      case 'richestGain': {
+        const r = [...active].sort((a,b) => b.cash - a.cash)[0];
+        if (r) players = players.map(p => p.id === r.id ? { ...p, cash: p.cash + amount } : p);
+        break;
+      }
+      case 'richestPaysPoarest': {
+        const s = [...active].sort((a,b) => b.cash - a.cash);
+        const r2 = s[0]; const poor = s[s.length - 1];
+        if (r2 && poor && r2.id !== poor.id) {
+          players = players.map(p =>
+            p.id === r2.id ? { ...p, cash: p.cash - amount }
+            : p.id === poor.id ? { ...p, cash: p.cash + amount }
+            : p);
+        }
+        break;
+      }
+      case 'allPayPercent':
+        players = players.map(p => p.isActive
+          ? { ...p, cash: p.cash - Math.max(100, Math.round(p.cash * amount / 100)) }
+          : p);
+        break;
+      case 'rentFree':
+        players = players.map((p, i) => i === idx ? { ...p, hasRentFreePass: true } : p);
+        break;
+    }
+    set({ game: { ...g, players } });
+  },
+
+  downgradeCityUpgrade: (cityId) => {
+    const g = get().game;
+    if (!g) return 0;
+    const city = g.cities[cityId];
+    if (!city || city.level <= 0) return 0;
+    const refund = Math.round(getUpgradeCost(city) * 0.75);
+    const cities  = { ...g.cities, [cityId]: { ...city, level: city.level - 1 } };
+    const players = g.players.map((p) =>
+      p.id === city.ownerId ? { ...p, cash: p.cash + refund } : p
+    );
+    set({ game: { ...g, players, cities } });
+    return refund;
+  },
 
   forfeitTurn: () => {
     const g = get().game;

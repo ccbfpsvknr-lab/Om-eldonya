@@ -4,7 +4,7 @@ export const MAX_UPGRADE_LEVEL = 3;
 /** Upgrade cost = 15 % of the city's purchase price per level. */
 export const UPGRADE_COST_RATIO = 0.15;
 /** Refund on region-break = 50 % of upgrades invested. */
-export const UPGRADE_REFUND_RATIO = 0.5;
+export const UPGRADE_REFUND_RATIO = 0.75;  // all sells are player-initiated — no trading
 /** Rent multipliers per upgrade level (region-complete baseline = ×2 lives in economyEngine). */
 export const UPGRADE_MULTIPLIERS = [1, 2, 4, 8] as const;
 
@@ -33,12 +33,13 @@ export function stripRegionUpgrades(
   cities: Record<string, City>,
   region: string,
   playerId: string,
+  refundRatio = UPGRADE_REFUND_RATIO,
 ): { updatedCities: Record<string, City>; refund: number } {
   let refund = 0;
   const updatedCities = { ...cities };
   for (const [id, city] of Object.entries(cities)) {
     if (city.region === region && city.ownerId === playerId && city.level > 0) {
-      refund += Math.round(totalUpgradeInvestment(city) * UPGRADE_REFUND_RATIO);
+      refund += Math.round(totalUpgradeInvestment(city) * refundRatio);
       updatedCities[id] = { ...city, level: 0 };
     }
   }

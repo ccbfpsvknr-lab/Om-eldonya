@@ -145,6 +145,7 @@ export interface Game {
   newsRentMultiplier: number;
   /** Whether the current player has used their trade this turn. */
   tradeUsedThisTurn: boolean;
+  hasUpgradedThisTurn: boolean;
   /** Jail tile index (derived from board). */
   jailTileIndex: number;
   /** Player IDs in the order they went bankrupt — first = بليلة title. */
