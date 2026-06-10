@@ -120,8 +120,8 @@ export function GameBoard() {
   const [diceDisplay, setDiceDisplay]   = useState<number | null>(null);
   // Use a ref in addition to state — ref updates are sync so Zustand's
   // useSyncExternalStore re-renders see the correct visual position immediately
-  const [, setAnimPosState]             = useState<number | null>(null);
-  const animPosRef                       = useRef<number | null>(null);
+  const [animPos, setAnimPosState]       = useState<number | null>(null);
+  const animPosRef                        = useRef<number | null>(null);
   const setAnimPos = (v: number | null) => { animPosRef.current = v; setAnimPosState(v); };
   const [smokePos, setSmokePos]         = useState<number | null>(null);
   const [isMoving, setIsMoving]         = useState(false);
