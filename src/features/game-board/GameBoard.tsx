@@ -70,10 +70,10 @@ const CITY_EMOJI: Record<string, string> = {
 };
 
 const CORNER_STYLE: Record<string, { bg: string; icon: string; label: string }> = {
-  ramses: { bg: 'linear-gradient(135deg, #1a3a08, #0d2005)', icon: '🏁', label: 'ابدأ' },
-  jail:   { bg: 'linear-gradient(135deg, #3a0a0a, #200606)', icon: '🔒', label: 'الحجز' },
-  rest:   { bg: 'linear-gradient(135deg, #3a1a05, #221008)', icon: '☕', label: 'القهوة' },
-  police: { bg: 'linear-gradient(135deg, #3a0808, #1e0404)', icon: '🚔', label: 'كمين' },
+  ramses: { bg: 'linear-gradient(135deg, #2d7a1e, #1a5210)', icon: '🏁', label: 'ابدأ' },
+  jail:   { bg: 'linear-gradient(135deg, #7a1a1a, #501010)', icon: '🔒', label: 'الحجز' },
+  rest:   { bg: 'linear-gradient(135deg, #7a4a10, #503008)', icon: '☕', label: 'القهوة' },
+  police: { bg: 'linear-gradient(135deg, #8a1010, #600808)', icon: '🚔', label: 'كمين' },
 };
 
 const SPECIAL_STYLE: Record<string, { border: string; icon: string }> = {
@@ -372,22 +372,62 @@ export function GameBoard() {
       );
 
     } else if (tile.type === 'project') {
-      const gid = open(
-        <GovOfficeModal
-          tileName={tile.name}
-          player={player}
-          allPlayers={g.players}
-          onDone={(action) => {
-            close(gid);
-            if (action === 'skip') { markSkipTurn(player.id); return; }
-            if (action === 'payAmount' && action !== undefined) return;
-          }}
-          payAmount={payAmount}
-          transferBetweenPlayers={transferBetweenPlayers}
-          checkInsolvency={checkInsolvency}
-        />,
-        { size: 'sm', hideClose: true, dismissable: false }
-      );
+      if (tile.name === 'الديوان المحلي') {
+        // Choice required — use modal
+        const canAffordBribe = player.cash >= 300;
+        const did = open(
+          <div className="space-y-4 text-center" dir="rtl">
+            <div className="text-5xl">🏛️</div>
+            <h3 className="text-2xl font-extrabold text-gold-sheen">الديوان المحلي</h3>
+            <p className="text-sm text-content leading-relaxed">
+              الموظف مش موجود… السيستم واقع… والأوراق ضاعت 😤<br/>تدفع ولا تستنى؟
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => { markSkipTurn(player.id); close(did); }}
+                className="flex-1 rounded-xl py-3 text-sm font-bold"
+                style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC', cursor: 'pointer' }}>
+                استنى الدور الجاي 😤
+              </button>
+              <button
+                disabled={!canAffordBribe}
+                onClick={() => { if (canAffordBribe) { payAmount(300); checkInsolvency(player.id); close(did); } }}
+                className="flex-1 rounded-xl py-3 text-sm font-bold"
+                style={{
+                  background: canAffordBribe ? 'linear-gradient(135deg,#E8C040,#C49020)' : 'rgba(56,74,110,0.3)',
+                  color: canAffordBribe ? '#0E1726' : '#9AA6BC', border: 'none',
+                  cursor: canAffordBribe ? 'pointer' : 'not-allowed',
+                }}>
+                {canAffordBribe ? 'بلّط! ادفع ٣٠٠ 💸' : 'الجيب فاضي 😅'}
+              </button>
+            </div>
+          </div>,
+          { size: 'sm', hideClose: true, dismissable: false }
+        );
+      } else if (tile.name === 'شركة المياه') {
+        const bill = 150;
+        payAmount(bill);
+        showToast(<div className="text-center"><div className="text-4xl mb-2">💧</div><h3 className="text-xl text-gold-sheen">شركة المياه</h3><p className="text-sm text-content mt-1">وصلتك فاتورة المياه يا أخي!</p><p className="text-lg font-extrabold text-clay mt-1">−{bill.toLocaleString('en-US')} جنيه</p></div>);
+        checkInsolvency(player.id);
+      } else if (tile.name === 'شركة الكهرباء') {
+        const bill = Math.min(Math.max(Math.round(player.cash * 0.10), 200), 2000);
+        payAmount(bill);
+        showToast(<div className="text-center"><div className="text-4xl mb-2">⚡</div><h3 className="text-xl text-gold-sheen">شركة الكهرباء</h3><p className="text-sm text-content mt-1">فاتورتك وصلت… وده اللي أنت فيه 😬</p><p className="text-lg font-extrabold text-clay mt-1">−{bill.toLocaleString('en-US')} جنيه</p></div>);
+        checkInsolvency(player.id);
+      } else if (tile.name === 'المحكمة الاقتصادية') {
+        const activePlayers = g.players.filter(p => p.isActive);
+        const sorted = [...activePlayers].sort((a, b) => b.cash - a.cash);
+        const richest = sorted[0];
+        const poorest = sorted[sorted.length - 1];
+        if (richest && poorest && richest.id !== poorest.id) {
+          transferBetweenPlayers(richest.id, poorest.id, 400);
+          showToast(<div className="text-center"><div className="text-4xl mb-2">⚖️</div><h3 className="text-xl text-gold-sheen">المحكمة الاقتصادية</h3><p className="text-sm text-content mt-1">{richest.name} دفع ٤٠٠ لـ {poorest.name}</p><p className="text-xs text-muted mt-1">يا ريتني كنت فاهم القانون 😂</p></div>);
+          checkInsolvency(richest.id);
+        } else {
+          showToast(<div className="text-center"><div className="text-4xl mb-2">⚖️</div><h3 className="text-xl text-gold-sheen">المحكمة الاقتصادية</h3><p className="text-sm text-muted">القاضي مش لاقي حد يحكم عليه 😂</p></div>);
+        }
+      } else {
+        showToast(<div className="text-center"><div className="text-4xl mb-2">🏗️</div><h3 className="text-xl text-gold-sheen">{tile.name}</h3><p className="text-sm text-muted">مشروع تحت الإنشاء 👷</p></div>, 1800);
+      }
 
     } else if (tile.type === 'tax') {
       const paid = payTax();
@@ -487,7 +527,7 @@ export function GameBoard() {
         }
       }, 400);
     }, 850);
-  }, [diceRolling, isMoving, canRoll, isInJail, rollDice, movePlayer,
+  }, [diceRolling, isMoving, canDiceRoll, isInJail, rollDice, movePlayer,
       resolveJailTurn, animateAndMove, showToast, checkInsolvency]);
 
   // ── Upgrade modal ─────────────────────────────────────────────────────────
@@ -547,13 +587,13 @@ export function GameBoard() {
 
   return (
     <div dir="rtl" className="flex h-[100dvh] w-full items-center justify-center overflow-hidden"
-      style={{ background: '#060d1e' }}>
+      style={{ background: '#5c3a1e' }}>
       <div style={{ width: boardWidth, height: boardHeight, padding: isFastBoard ? '0' : '3px' }}>
         <div className="relative w-full h-full overflow-hidden"
           style={{
             borderRadius: isFastBoard ? '12px' : '12px',
-            boxShadow: '0 0 0 3px #0091EA, 0 0 0 6px #060d1e, 0 0 50px rgba(0,145,234,0.3)',
-            background: '#0d1b2e', padding: '2px',
+            boxShadow: '0 0 0 4px #c4a030, 0 0 0 8px #5c3a1e, 0 0 50px rgba(196,160,48,0.5)',
+            background: '#e8d5a0', padding: '3px',
           }}>
           <div className="w-full h-full" dir="ltr"
             style={{
@@ -561,7 +601,7 @@ export function GameBoard() {
               gridTemplateColumns: gridCols,
               gridTemplateRows: gridRows,
               gap: '1px',
-              background: '#0e1c30',
+              background: '#c4a030',
             }}>
 
             {/* ── Perimeter tiles ── */}
@@ -590,12 +630,12 @@ export function GameBoard() {
                 ? (cornerInfo?.bg ?? '#120d06')
                 : tile.type === 'city'
                   ? regionColor ? `linear-gradient(135deg, ${regionColor}25, ${regionColor}10)` : '#1a1208'
-                  : '#141008';
+                  : '#faf5e8';
 
               // Road strip with lane markings + owner bar + vehicles
               const roadStrip = (pos: 'first' | 'last') => (
                 <div style={{
-                  flexShrink: 0, background: '#060503', position: 'relative',
+                  flexShrink: 0, background: '#2a1206', position: 'relative',
                   ...(isHoriz
                     ? { width: `${ROAD_PCT}%`, height: '100%' }
                     : { width: '100%', height: `${ROAD_PCT}%` }),
@@ -644,7 +684,7 @@ export function GameBoard() {
                   className={cn('relative overflow-hidden', isCurrent && 'z-10')}
                   style={{
                     gridColumn: col, gridRow: row, background: tileBg,
-                    border: isCurrent ? `2px solid ${regionColor ?? '#E0B43C'}` : regionColor ? `1px solid ${regionColor}88` : '1px solid rgba(20,40,80,0.8)',
+                    border: isCurrent ? `3px solid ${regionColor ?? '#E0B43C'}` : regionColor ? `2px solid ${regionColor}cc` : '1px solid rgba(180,140,40,0.5)',
                     boxShadow: isCurrent ? `0 0 14px ${regionColor ?? '#E0B43C'}70` : 'none',
                     display: 'flex',
                     flexDirection: isCorner ? 'column' : (isHoriz ? 'row' : 'column'),
@@ -670,7 +710,7 @@ export function GameBoard() {
                       <div style={{ fontSize: isFastBoard ? '30px' : '20px', lineHeight: 1 }}>
                         {cpJailedHere ? '🔒' : cornerInfo?.icon ?? '👑'}
                       </div>
-                      <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#EADBB7',
+                      <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#1a0d04',
                         fontFamily: "'Cairo'", fontWeight: 700, textAlign: 'center', direction: 'rtl', lineHeight: 1.2 }}>
                         {cpJailedHere ? 'محبوس' : cornerInfo?.label ?? tile.name}
                       </div>
@@ -685,7 +725,7 @@ export function GameBoard() {
                         {landmark}
                       </div>
                       {/* Name */}
-                      <div style={{ fontSize: isFastBoard ? '11px' : '8.5px', fontWeight: 800, color: '#EADBB7',
+                      <div style={{ fontSize: isFastBoard ? '11px' : '8.5px', fontWeight: 800, color: '#1a0d04',
                         fontFamily: "'Cairo'", textAlign: 'center', direction: 'rtl', lineHeight: 1.1,
                         overflow: 'hidden', maxWidth: '100%', flexShrink: 0 }}>
                         {tile.name}
@@ -694,17 +734,17 @@ export function GameBoard() {
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
                         {!isOwned ? (
                           <>
-                            <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#E0B43C',
+                            <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#7a4800',
                               lineHeight: 1, fontFamily: 'monospace', fontWeight: 700 }}>
                               🪙{fmt(city?.price ?? 0)}
                             </div>
-                            <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#FF6B9D',
+                            <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#9a0030',
                               lineHeight: 1, fontFamily: 'monospace' }}>
                               🏠{city?.baseRent ?? 0}
                             </div>
                           </>
                         ) : (
-                          <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#FF6B9D',
+                          <div style={{ fontSize: isFastBoard ? '9px' : '7.5px', color: '#9a0030',
                             lineHeight: 1, fontFamily: 'monospace', fontWeight: 800 }}>
                             🏠{city?.baseRent ?? 0}
                           </div>
@@ -725,7 +765,7 @@ export function GameBoard() {
                         filter: `drop-shadow(0 0 4px ${specialInfo?.border ?? 'rgba(224,180,60,0.4)'})` }}>
                         {specialInfo?.icon ?? '□'}
                       </div>
-                      <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#9AA6BC',
+                      <div style={{ fontSize: isFastBoard ? '8px' : '6.5px', color: '#3a2a08',
                         textAlign: 'center', direction: 'rtl', lineHeight: 1.1, overflow: 'hidden' }}>
                         {tile.name}
                       </div>
@@ -761,7 +801,7 @@ export function GameBoard() {
             })}
             {/* ── CENTER AREA ── */}
             <div style={{ gridColumn: centerCol, gridRow: centerRow, position: 'relative', overflow: 'hidden',
-              background: 'rgb(10 16 28 / 0.92)' }}>
+              background: 'rgba(15, 8, 2, 0.90)' }}>
 
               {/* Mini Egyptian landscape */}
               {(
