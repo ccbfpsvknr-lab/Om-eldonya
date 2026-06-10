@@ -86,6 +86,10 @@ const SPECIAL_STYLE: Record<string, { border: string; icon: string }> = {
   project: { border: 'rgba(42,157,143,0.4)',  icon: '🏗️' },
 };
 
+// ─── Shared helpers — module level so all modal components can access them ──
+const cashEmoji = (n: number): string =>
+  n < 200 ? '🪙' : n < 800 ? '💵' : n < 3000 ? '💰' : '💸';
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function GameBoard() {
   const navigate   = useNavigate();
@@ -217,11 +221,6 @@ export function GameBoard() {
   const myCities = Object.values(game.cities).filter((c) => c.ownerId === cp.id);
   const canUpgradeAny = !isFast && !game.hasUpgradedThisTurn && myCities.some((c) => canUpgrade(game, c, cp.id));
   const canSell  = myCities.length > 0 && (phase === 'rolling' || phase === 'turn-end') && !isMoving && !isFast;
-
-  
-// Dynamic currency emoji — scales with amount
-const cashEmoji = (n: number): string =>
-  n < 200 ? '🪙' : n < 800 ? '💵' : n < 3_000 ? '💰' : '💸';
 
   // Board visuals
   const cpVisualPos = animPosRef.current !== null ? animPosRef.current : cp.position;
