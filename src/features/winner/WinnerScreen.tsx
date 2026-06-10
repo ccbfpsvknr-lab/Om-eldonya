@@ -30,9 +30,12 @@ function computeTitles(
 export function WinnerScreen() {
   const navigate     = useNavigate();
   const resetGame    = useGameStore((s) => s.resetGame);
+  const config       = useGameStore((s) => s.config);
   const resetPlayers = usePlayersStore((s) => s.resetPlayers);
+  const lobbyPlayers = usePlayersStore((s) => s.players);
   const game         = useMatchStore((s) => s.game);
   const resetMatch   = useMatchStore((s) => s.resetMatch);
+  const createMatch  = useMatchStore((s) => s.createMatch);
 
   const players         = game?.players ?? [];
   const winnerId        = game?.winnerId ?? null;
@@ -43,7 +46,11 @@ export function WinnerScreen() {
   const durationMs      = (stats?.finishedAt ?? Date.now()) - (stats?.startedAt ?? Date.now());
   const durationMin     = Math.round(durationMs / 60000);
 
-  const playAgain = () => { resetMatch(); resetGame(); resetPlayers(); navigate(ROUTES.home); };
+  const playAgain = () => {
+    resetMatch();                          // wipe old match state
+    createMatch(config, lobbyPlayers);     // new game — same players & mode
+    navigate(ROUTES.reveal);              // re-randomize who goes first
+  };
 
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden" dir="rtl"

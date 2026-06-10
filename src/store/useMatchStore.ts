@@ -529,7 +529,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     const isFast = g.mode === 'quick';
     // Fast: roll 6 = free (0 coins), roll other = pay 200 flat
     // Classic: no payment in either case (losing turn is the penalty)
-    const fee = isFast && diceValue !== 6 ? 200 : 0;
+    const fee = isFast && diceValue !== 6 ? 500 : 0;
     const idx = g.currentPlayerIndex;
     const players = g.players.map((p, i) =>
       i === idx ? { ...p, cash: p.cash - fee, jailTurns: 0 } : p

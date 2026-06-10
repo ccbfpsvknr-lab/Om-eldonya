@@ -752,29 +752,21 @@ export function GameBoard() {
                   {occupants.length > 0 && (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex',
                       alignItems: 'center', justifyContent: 'center', zIndex: 15 }}>
-                      {occupants.map((o) => {
-                        // Rotate vehicle emoji based on movement direction
-                        const dirDeg = edge === 'top'    ?   0   // bottom row → right
-                                     : edge === 'left'   ? -90   // right col ↑ up
-                                     : edge === 'bottom' ? 180   // top row ← left
-                                     :                     90;   // left col ↓ down
-                        const scl = isMoving && o.id === cp.id ? 1.4 : 1;
-                        return (
-                          <span key={o.id}
-                            className={cn(!isMoving && isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
-                            style={{
-                              fontSize: (isFastBoard || isClassicRect) ? '18px' : '13px', lineHeight: 1,
-                              display: 'inline-block',
-                              transform: `rotate(${dirDeg}deg) scale(${scl})`,
-                              transition: 'transform 0.12s ease',
-                              filter: o.id === cp.id
-                                ? 'drop-shadow(0 0 5px rgba(224,180,60,0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.9))'
-                                : 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
-                            }}>
-                            {o.vehicle}
-                          </span>
-                        );
-                      })}
+                      {occupants.map((o) => (
+                        <span key={o.id}
+                          className={cn(!isMoving && isCurrent && o.id === cp.id ? 'animate-vehicle-land' : '')}
+                          style={{
+                            fontSize: (isFastBoard || isClassicRect) ? '18px' : '13px', lineHeight: 1,
+                            display: 'inline-block',
+                            transform: isMoving && o.id === cp.id ? 'scale(1.4)' : 'scale(1)',
+                            transition: 'transform 0.12s ease',
+                            filter: o.id === cp.id
+                              ? 'drop-shadow(0 0 5px rgba(224,180,60,0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.9))'
+                              : 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
+                          }}>
+                          {o.vehicle}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -785,7 +777,7 @@ export function GameBoard() {
                   className={cn('relative overflow-hidden', isCurrent && 'z-10')}
                   style={{
                     gridColumn: col, gridRow: row, background: tileBg,
-                    border: isCurrent ? `3px solid ${regionColor ?? '#E0B43C'}` : regionColor ? `2px solid ${regionColor}cc` : '1px solid rgba(180,140,40,0.5)',
+                    border: isCurrent ? `3px solid ${regionColor ?? '#E0B43C'}` : regionColor ? `1px solid ${regionColor}66` : '1px solid rgba(180,140,40,0.5)',
                     boxShadow: isCurrent ? `0 0 14px ${regionColor ?? '#E0B43C'}70` : 'none',
                     display: 'flex',
                     flexDirection: isCorner ? 'column' : (isHoriz ? 'row' : 'column'),
@@ -798,16 +790,25 @@ export function GameBoard() {
                   {isCorner ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'center', gap: '2px', padding: '3px' }}>
-                      {occupants.length > 0 && (
-                        <div style={{ display: 'flex', gap: '1px', marginBottom: '2px' }}>
-                          {occupants.map((o) => (
-                            <span key={o.id} style={{ fontSize: (isFastBoard || isClassicRect) ? '18px' : '13px',
-                              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))', lineHeight: 1 }}>
-                              {o.vehicle}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {occupants.length > 0 && (() => {
+                        // Position vehicle at the INWARD corner (corner facing board center)
+                        const cl = game.board.length;
+                        const corners = cl === 16 ? [0,5,8,13] : [0,7,12,19];
+                        const ci = corners.indexOf(tile.index);
+                        // BL→top-right, BR→top-left, TR→bottom-left, TL→bottom-right
+                        const pos = ci===0 ? { top:3, right:3 } : ci===1 ? { top:3, left:3 }
+                                  : ci===2 ? { bottom:3, left:3 } : { bottom:3, right:3 };
+                        return (
+                          <div style={{ position:'absolute', zIndex:15, ...pos, display:'flex', gap:'1px' }}>
+                            {occupants.map((o) => (
+                              <span key={o.id} style={{ fontSize: (isFastBoard||isClassicRect)?'18px':'13px',
+                                filter:'drop-shadow(0 2px 4px rgba(0,0,0,0.8))', lineHeight:1 }}>
+                                {o.vehicle}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       <div style={{ fontSize: (isFastBoard || isClassicRect) ? '30px' : '20px', lineHeight: 1 }}>
                         {cpJailedHere ? '🔒' : cornerInfo?.icon ?? '👑'}
                       </div>
@@ -826,7 +827,7 @@ export function GameBoard() {
                         {landmark}
                       </div>
                       {/* Name */}
-                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '11px' : '8.5px', fontWeight: 800, color: '#1a0d04',
+                      <div style={{ fontSize: (isFastBoard || isClassicRect) ? '11px' : '8.5px', fontWeight: 800, color: regionColor ? '#ffffff' : '#1a0d04',
                         fontFamily: "'Cairo'", textAlign: 'center', direction: 'rtl', lineHeight: 1.1,
                         overflow: 'hidden', maxWidth: '100%', flexShrink: 0 }}>
                         {tile.name}
@@ -849,7 +850,7 @@ export function GameBoard() {
                                 </div>
                               </>
                             ) : (
-                              <div style={{ fontSize: fs, color: '#9a0030', lineHeight: 1, fontFamily: 'monospace', fontWeight: 800 }}>
+                              <div style={{ fontSize: fs, color: regionColor ? '#ffffffdd' : '#9a0030', lineHeight: 1, fontFamily: 'monospace', fontWeight: 800 }}>
                                 {cashEmoji(liveRent)}{liveRent}
                               </div>
                             )}

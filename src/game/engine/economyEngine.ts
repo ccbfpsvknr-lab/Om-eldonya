@@ -36,5 +36,6 @@ export function getCityRent(game: Game, city: City): number {
   const levelMult = UPGRADE_MULTIPLIERS[Math.min(city.level, 3) as 0 | 1 | 2 | 3];
   const regionMult = complete ? 2 : 1;
   const newsMultiplier = game.newsRentMultiplier ?? 1;
-  return Math.round(city.baseRent * levelMult * regionMult * newsMultiplier);
+  const fastMult = game.mode === 'quick' ? 2 : 1;
+  return Math.round(city.baseRent * levelMult * regionMult * newsMultiplier * fastMult);
 }
