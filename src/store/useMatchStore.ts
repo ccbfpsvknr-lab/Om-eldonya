@@ -49,6 +49,7 @@ interface MatchState {
   triggerNewsEvent: () => void;
   setWinner: (playerId: string | null) => void;
   /** Roll dice in jail: pay 2% (if 6) or 4% of starting cash, always frees player. */
+  forfeitTurn: () => void;
   resolveJailTurn: (diceValue: number) => number;
   payAmount: (amount: number) => number;
   transferBetweenPlayers: (fromId: string, toId: string, amount: number) => void;
@@ -281,7 +282,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       p.id === playerId ? {
         ...p,
         position: s.game!.jailTileIndex,
-        jailTurns: isFast ? 1 : 3,
+        jailTurns: 1,  // 1 turn for both modes — rule difference is handled in roll logic
         jailCount: p.jailCount + 1,
       } : p
     );
@@ -442,12 +443,19 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     }
   } : s),
 
+  forfeitTurn: () => {
+    const g = get().game;
+    if (!g) return;
+    set({ game: { ...g, phase: 'turn-end' } });
+  },
+
   resolveJailTurn: (diceValue) => {
     const g = get().game;
     if (!g) return 0;
-    const startingCash = g.mode === 'quick' ? FAST_STARTING_CASH : STARTING_CASH;
-    const pct = diceValue === 6 ? 0.02 : 0.04;
-    const fee = Math.round(startingCash * pct);
+    const isFast = g.mode === 'quick';
+    // Fast: roll 6 = free (0 coins), roll other = pay 200 flat
+    // Classic: no payment in either case (losing turn is the penalty)
+    const fee = isFast && diceValue !== 6 ? 200 : 0;
     const idx = g.currentPlayerIndex;
     const players = g.players.map((p, i) =>
       i === idx ? { ...p, cash: p.cash - fee, jailTurns: 0 } : p

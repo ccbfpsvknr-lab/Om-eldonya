@@ -26,13 +26,13 @@ export const PLAYER_COLORS = [
 
 export const PLAYER_LIMITS = {
   min: 2,
-  max: 6,
+  max: 4,
 } as const;
 
 export const DEFAULT_CONFIG: GameConfig = {
   roomCode: '',
   mode: 'classic',
-  maxPlayers: 6,
+  maxPlayers: 4,
   roundsCount: 5,
 };
 

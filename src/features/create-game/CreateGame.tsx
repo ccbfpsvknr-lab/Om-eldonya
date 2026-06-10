@@ -12,7 +12,7 @@ const MODES: {
   {
     id: 'quick',
     title: 'سريعة',
-    tagline: 'جولة كاملة في ٣٠ دقيقة',
+    tagline: 'جولة كاملة في ١٠-٢٠ دقيقة',
     icon: '⚡',
     features: ['بدون ترقيات', 'بدون سلفة', 'نهاية سريعة'],
     tiles: 16,
@@ -53,6 +53,7 @@ export function CreateGame() {
   const config      = useGameStore((s) => s.config);
   const setMode     = useGameStore((s) => s.setMode);
   const updateConfig = useGameStore((s) => s.updateConfig);
+  const modeMax = config.mode === 'quick' ? 3 : 4;   // fast=3, classic/custom=4
 
   const selectedMode = MODES.find((m) => m.id === config.mode) ?? MODES[0];
 
@@ -177,7 +178,7 @@ export function CreateGame() {
             </span>
           </div>
           <div className="flex items-center justify-between px-3 py-3 gap-2">
-            {Array.from({ length: PLAYER_LIMITS.max - PLAYER_LIMITS.min + 1 }, (_, i) => {
+            {Array.from({ length: modeMax - PLAYER_LIMITS.min + 1 }, (_, i) => {
               const n = i + PLAYER_LIMITS.min;
               const selected = config.maxPlayers === n;
               return (

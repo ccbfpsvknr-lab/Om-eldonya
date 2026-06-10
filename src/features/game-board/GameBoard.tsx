@@ -98,6 +98,7 @@ export function GameBoard() {
   const upgradeCity      = useMatchStore((s) => s.upgradeCity);
   const goToJail         = useMatchStore((s) => s.goToJail);
   const resolveJailTurn  = useMatchStore((s) => s.resolveJailTurn);
+  const forfeitTurn      = useMatchStore((s) => s.forfeitTurn);
   const decrementJailTurns = useMatchStore((s) => s.decrementJailTurns);
   const payTax           = useMatchStore((s) => s.payTax);
   const drawChance       = useMatchStore((s) => s.drawAndApplyChanceCard);
@@ -501,22 +502,42 @@ export function GameBoard() {
 
       setTimeout(() => {
         if (isInJail) {
-          const fee = resolveJailTurn(rollValue);
-          showToast(
-            <div className="text-center">
-              <div className="text-4xl mb-2">{rollValue === 6 ? '🤙' : '😅'}</div>
-              <h3 className="text-xl text-gold-sheen">رميت {rollValue}</h3>
-              <p className="text-sm text-content mt-1">
-                {rollValue === 6 ? `اكسبت! ادفع ${fee.toLocaleString('en-US')} بس 🤙` : `ادفع ${fee.toLocaleString('en-US')} وامشي`}
-              </p>
-              <p className="text-sm font-bold text-teal mt-1">يلا طلعت برة 🏃</p>
-            </div>,
-            2000
-          );
-          checkInsolvency(before.id);
-          setAnimPos(before.position); // lock visual before logical move
-          movePlayer(rollValue);
-          animateAndMove(before.position, rollValue, g!.board.length, 0);
+          const fee = resolveJailTurn(rollValue); // frees player + applies fee per mode
+          const modeIsFast = g!.mode === 'quick';
+
+          if (modeIsFast || rollValue === 6) {
+            // Fast: always move (6=free, other=paid 200)
+            // Classic roll 6: free + move
+            showToast(
+              <div className="text-center">
+                <div className="text-4xl mb-2">{rollValue === 6 ? '🎉' : '😅'}</div>
+                <h3 className="text-xl text-gold-sheen">رميت {rollValue}</h3>
+                <p className="text-sm text-content mt-1">
+                  {rollValue === 6
+                    ? 'خروج مجاني! 🎉'
+                    : `ادفع ${fee.toLocaleString('en-US')} وامشي 😅`}
+                </p>
+                <p className="text-sm font-bold text-teal mt-1">يلا طلعت برة 🏃</p>
+              </div>,
+              2000
+            );
+            if (fee > 0) checkInsolvency(before.id);
+            setAnimPos(before.position);
+            movePlayer(rollValue);
+            animateAndMove(before.position, rollValue, g!.board.length, 0);
+          } else {
+            // Classic non-6: lose turn, no payment, no movement
+            showToast(
+              <div className="text-center">
+                <div className="text-4xl mb-2">😬</div>
+                <h3 className="text-xl text-gold-sheen">رميت {rollValue}</h3>
+                <p className="text-sm text-content mt-1">مش ٦… خسرت الدور ده</p>
+                <p className="text-sm text-muted mt-1">الدور الجاي بتلعب عادي 👋</p>
+              </div>,
+              2200
+            );
+            forfeitTurn(); // sets phase:'turn-end', end turn button appears
+          }
         } else {
           const cashBefore = before.cash;
           setAnimPos(before.position); // lock visual before logical move
@@ -528,7 +549,7 @@ export function GameBoard() {
       }, 400);
     }, 850);
   }, [diceRolling, isMoving, canDiceRoll, isInJail, rollDice, movePlayer,
-      resolveJailTurn, animateAndMove, showToast, checkInsolvency]);
+      resolveJailTurn, forfeitTurn, animateAndMove, showToast, checkInsolvency]);
 
   // ── Upgrade modal ─────────────────────────────────────────────────────────
   const openUpgradeModal = () => {
@@ -650,11 +671,24 @@ export function GameBoard() {
                   }}/>
                   {/* Owner colour bar on the city-facing edge */}
                   {ownerColor && (
-                    <div style={{ position: 'absolute', inset: 0,
+                    <div style={{
+                      position: 'absolute',
                       ...(isHoriz
-                        ? { [pos === 'first' ? 'borderRight' : 'borderLeft']: `3px solid ${ownerColor}` }
-                        : { [pos === 'first' ? 'borderBottom' : 'borderTop']: `3px solid ${ownerColor}` }),
-                      opacity: 0.9 }}/>
+                        ? {
+                            top: 0, bottom: 0,
+                            [pos === 'first' ? 'right' : 'left']: 0,
+                            width: '7px',
+                            background: ownerColor,
+                            boxShadow: `0 0 8px 2px ${ownerColor}cc`,
+                          }
+                        : {
+                            left: 0, right: 0,
+                            [pos === 'first' ? 'bottom' : 'top']: 0,
+                            height: '7px',
+                            background: ownerColor,
+                            boxShadow: `0 0 8px 2px ${ownerColor}cc`,
+                          }),
+                    }}/>
                   )}
                   {/* Vehicles in the road */}
                   {occupants.length > 0 && (
