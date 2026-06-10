@@ -834,7 +834,8 @@ const cashEmoji = (n: number): string =>
                       </div>
                       {/* Price + Live Rent */}
                       {(() => {
-                        const liveRent = city ? getCityRent(game, city) : 0;
+                        // For unowned: show baseRent (what you'd pay). For owned: show live rent (with upgrades/region bonus).
+                        const liveRent = city ? (isOwned ? getCityRent(game, city) : (city.baseRent ?? 0)) : 0;
                         const fs  = (isFastBoard || isClassicRect) ? '9px' : '7px';
                         const fsS = (isFastBoard || isClassicRect) ? '8px' : '6px';
                         return (

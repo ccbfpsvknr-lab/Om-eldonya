@@ -446,6 +446,22 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     }
   } : s),
 
+  markSkipTurn: (playerId) => set((s) => {
+    if (!s.game) return s;
+    const players = s.game.players.map((p) =>
+      p.id === playerId ? { ...p, skipTurns: p.skipTurns + 1 } : p
+    );
+    return { game: { ...s.game, players } };
+  }),
+
+  decrementSkipTurns: (playerId) => set((s) => {
+    if (!s.game) return s;
+    const players = s.game.players.map((p) =>
+      p.id === playerId ? { ...p, skipTurns: Math.max(0, p.skipTurns - 1) } : p
+    );
+    return { game: { ...s.game, players } };
+  }),
+
   applyNewsEvent: (effect, amount) => {
     const g = get().game;
     if (!g) return;
