@@ -100,22 +100,23 @@ export function RoomScreen() {
   const resetPlayers = usePlayersStore((s) => s.resetPlayers);
   const addPlayer    = usePlayersStore((s) => s.addPlayer);
   const toggleBot    = usePlayersStore((s) => s.toggleBot);
-  const setConfig    = useGameStore((s) => s.setConfig);
+  const setGameMode  = useGameStore((s) => s.setMode);
 
   const handleStart = async () => {
     if (!room) return;
     try {
       // Set up local player store from room roster
       resetPlayers();
-      room.players.forEach((p) => {
-        addPlayer(p.nickname, p.vehicle);
-      });
-      // Mark bots
+      room.players.forEach((p) => { addPlayer(p.nickname, p.vehicle); });
+      // Mark bots by ID — get current players after adding them
+      const currentPlayers = usePlayersStore.getState().players;
       room.players.forEach((p, i) => {
-        if (p.isBot) toggleBot(i);
+        if (p.isBot && currentPlayers[i]) {
+          toggleBot(currentPlayers[i].id);
+        }
       });
       // Set game mode
-      setConfig({ mode: room.mode });
+      setGameMode(room.mode);
       // Update room status in DB
       const { supabase } = await import('@/lib/supabase');
       await supabase.from('rooms').update({ status: 'playing' }).eq('id', room.id);
