@@ -31,9 +31,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Check existing session (auto-login)
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      const { data } = await supabase
+      let { data: profileData } = await supabase
         .from('profiles').select('*').eq('id', session.user.id).single();
-      set({ user: session.user, session, profile: data ?? null });
+
+      // Trigger may have failed — create profile here if missing
+      if (!profileData) {
+        const meta = session.user.user_metadata ?? {};
+        const baseUser = (meta.username as string)?.toLowerCase()
+          ?? session.user.email?.split('@')[0] ?? 'user';
+        const { count } = await supabase
+          .from('profiles').select('id', { count: 'exact', head: true });
+        await supabase.from('profiles').upsert({
+          id:       session.user.id,
+          username: baseUser,
+          nickname: (meta.nickname as string) || baseUser,
+          email:    session.user.email ?? '',
+          coins:    500,
+          is_admin: (count ?? 0) === 0,   // first user = admin
+        });
+        const { data: newP } = await supabase
+          .from('profiles').select('*').eq('id', session.user.id).single();
+        profileData = newP;
+      }
+      set({ user: session.user, session, profile: profileData ?? null });
     }
     set({ initialized: true });
 
