@@ -18,6 +18,7 @@ export function AuthScreen() {
   const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
 
+
   const clearMessages = () => { setError(''); setSuccess(''); };
 
   const handleLogin = async () => {
@@ -36,7 +37,7 @@ export function AuthScreen() {
     clearMessages();
     const err = await signUp(email.trim(), password, username.trim().toLowerCase(), nickname.trim());
     if (err) setError(err);
-    else setSuccess('تم إنشاء الحساب! تحقق من إيميلك وافتح اللينك ثم ادخل.');
+    else setSuccess('تم إنشاء الحساب! 🎉 افتح إيميلك واضغط على اللينك عشان تفعّل الحساب، وبعدين ادخل.');
   };
 
   const handleReset = async () => {

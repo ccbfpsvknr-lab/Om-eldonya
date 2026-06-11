@@ -50,18 +50,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email, password, username, nickname) => {
     set({ loading: true });
     try {
-      // Check username uniqueness first
-      const { data: existing } = await supabase
-        .from('profiles').select('id').eq('username', username).single();
-      if (existing) return 'اسم المستخدم ده موجود بالفعل، جرب تاني';
+      // Normalize username to lowercase (case-insensitive)
+      const normalizedUsername = username.trim().toLowerCase();
 
       const { error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
-        options: { data: { username, nickname } },
+        options: { data: { username: normalizedUsername, nickname: nickname.trim() } },
       });
-      if (error) return translateError(error.message);
-      return null; // success
+      if (error) {
+        if (error.message.includes('already registered') || error.message.includes('already been registered'))
+          return 'الإيميل ده متسجل بالفعل';
+        return translateError(error.message);
+      }
+      return null; // success — user should verify email
     } finally {
       set({ loading: false });
     }

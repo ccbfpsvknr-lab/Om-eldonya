@@ -411,40 +411,8 @@ export function GameBoard() {
       const result = drawChance();
       if (!result) return;
       const card = getCard(result.cardId);
-      // Bot: apply effects silently without modal
-      if (isCurrentBot) {
-        if (card.skipNextTurn) { markSkipTurn(player.id); }
-        else if (card.type === 'move') {
-          const g2b = useMatchStore.getState().game;
-          const cur2 = g2b?.players[g2b.currentPlayerIndex];
-          if (cur2 && g2b) {
-            const bLen = g2b.board.length;
-            const steps = card.toTile !== undefined
-              ? ((card.toTile - cur2.position + bLen) % bLen)
-              : (card.spaces ?? 0);
-            if (steps !== 0) {
-              const cashB = cur2.cash;
-              movePlayer(steps);
-              const after2 = useMatchStore.getState().game?.players[g2b.currentPlayerIndex];
-              const sal2 = Math.max(0, (after2?.cash ?? cashB) - cashB);
-              animateAndMove(cur2.position, steps, bLen, sal2);
-            }
-          }
-        } else if (card.type === 'police') {
-          const g3b = useMatchStore.getState().game;
-          const jIdx2 = g3b?.board.findIndex((t) => t.type === 'jail') ?? 7;
-          const bLen2 = g3b?.board.length ?? 24;
-          const from3 = player.position;
-          goToJail(player.id);
-          const steps3 = ((jIdx2 - from3) % bLen2 + bLen2) % bLen2 || bLen2;
-          animateAndMove(from3, steps3, bLen2, 0, () => {});
-        } else if (card.type === 'bonus' && card.rollAgain) {
-          setRollAgainPending(true);
-        } else if ((card.type === 'money' || card.type === 'govt') && card.amount && card.amount < 0) {
-          checkInsolvency(player.id);
-        }
-      } else {
-
+      // ALL players (including bots) see the chance card modal.
+      // Bots auto-close after 2.2s so watchers can see what happened.
       let cid = '';
       cid = open(
         <div className="space-y-4 text-center">
@@ -495,7 +463,7 @@ export function GameBoard() {
         </div>,
         { size: 'sm', dismissable: false, hideClose: true }
       );
-      } // end human chance modal
+
 
     } else if (tile.type === 'news') {
       const NEWS_POOL = [
@@ -645,7 +613,14 @@ export function GameBoard() {
               <p className="text-xl font-extrabold text-gold mt-1">+{salary.toLocaleString('en-US')} جنيه</p>
             </div>
           );
-          if (onDone) { onDone(); setIsMoving(false); } else { resolveLanding(); setIsMoving(false); }
+          if (onDone) {
+            onDone();
+            setIsMoving(false);
+          } else {
+            resolveLanding();
+            // Only stop moving if resolveLanding didn't start a secondary animation (e.g. jail)
+            if (!moveRef.current) setIsMoving(false);
+          }
         }, 150);
       }
     }, 350);
@@ -1142,12 +1117,6 @@ export function GameBoard() {
                       </h2>
                       <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                         {game.activeNewsEvent && <span style={{ fontSize: '8px', background: 'rgba(199,91,57,0.3)', borderRadius: '4px', padding: '0 3px', color: '#C75B39' }}>📰</span>}
-                        <button onClick={handleQuit}
-                          style={{ fontSize: '9px', fontWeight: 700, color: '#C75B39', cursor: 'pointer',
-                            background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)',
-                            borderRadius: '6px', padding: '3px 8px', lineHeight: 1 }}>
-                          ✕ خروج
-                        </button>
                       </div>
                     </div>
                   )}
@@ -1243,17 +1212,7 @@ export function GameBoard() {
                     )}
                   </div>
 
-                  {/* Quit (fast mode only) */}
-                  {isFastBoard && (
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <button onClick={handleQuit}
-                        style={{ fontSize: '11px', fontWeight: 700, color: '#C75B39', cursor: 'pointer',
-                          background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)',
-                          borderRadius: '8px', padding: '5px 14px', lineHeight: 1 }}>
-                        ✕ خروج
-                      </button>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* ── Right / Bottom section: leaderboard ── */}
@@ -1293,6 +1252,16 @@ export function GameBoard() {
                       );
                     })}
                   </div>
+                  {/* Exit — always visible below rankings */}
+                  <button onClick={handleQuit}
+                    style={{ marginTop: (isFastBoard||isClassicRect)?'6px':'3px', width: '100%',
+                      fontSize: (isFastBoard||isClassicRect)?'10px':'7px', fontWeight: 700,
+                      color: '#C75B39', cursor: 'pointer',
+                      background: 'rgba(199,91,57,0.1)', border: '1px solid rgba(199,91,57,0.3)',
+                      borderRadius: '6px', padding: (isFastBoard||isClassicRect)?'5px':'2px', lineHeight: 1,
+                      fontFamily: "'Cairo', sans-serif" }}>
+                    ✕ خروج
+                  </button>
                 </div>
               </div>
             </div>
