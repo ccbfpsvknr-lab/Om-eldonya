@@ -18,10 +18,10 @@ const STARS = [
 
 /* ─── Rules content ────────────────────────────────────────────────────────── */
 const RULES = [
-  'اجمع من ٢ لـ ٤ لاعبين على نفس الموبايل.',
+  'جمع من ٢ ل ٤ لاعيبة، و ابدأوا لعب.',
   'كل لاعب بياخد دور بالترتيب اللي بيظهر في شاشة القرعة.',
-  'اشتري مدن، اجمع إيجار، وابقى أغنى لاعب.',
-  'اللي يكسب هو «الكبير أوي» — الكبير على الجميع!',
+  'اشتري مدن، جمع ايجار، حاول متفلسش.',
+  'اللي يكسب هو الكبير اوي',
 ];
 
 function RulesContent() {
@@ -222,8 +222,12 @@ export function MainMenu() {
             👤
           </div>
           <div className="leading-tight">
-            <p className="text-xs font-bold text-[#F4CE5E]">لاعب جديد</p>
-            <p className="text-[10px] text-[#9AA6BC]">المستوى ١ ✦</p>
+            <p className="text-xs font-bold text-[#F4CE5E]">
+              {profile?.nickname ?? 'ضيف'}
+            </p>
+            <p className="text-[10px] text-[#9AA6BC]">
+              {profile ? `@${profile.username}` : 'العب بدون حساب'}
+            </p>
           </div>
         </div>
 
@@ -231,10 +235,13 @@ export function MainMenu() {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-xl border border-[rgba(224,180,60,0.25)] bg-[rgba(4,11,24,0.75)] px-2.5 py-1.5 backdrop-blur-md">
             <span className="text-sm">🪙</span>
-            <span className="text-xs font-bold text-[#F4CE5E]">0</span>
+            <span className="text-xs font-bold text-[#F4CE5E]">
+              {profile?.coins?.toLocaleString('en-US') ?? 0}
+            </span>
           </div>
-          <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-[rgba(56,74,110,0.7)] bg-[rgba(4,11,24,0.75)] text-base backdrop-blur-md hover:border-[rgba(224,180,60,0.4)] transition-colors">
-            ⚙️
+          <button onClick={openSettings}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[rgba(56,74,110,0.7)] bg-[rgba(4,11,24,0.75)] text-base backdrop-blur-md hover:border-[rgba(224,180,60,0.4)] transition-colors">
+            {user ? '⚙️' : '👤'}
           </button>
         </div>
       </div>
@@ -298,6 +305,12 @@ export function MainMenu() {
               fontSize: '1.15rem',
             }}
           >
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ background: 'linear-gradient(135deg, #F4CE5E 0%, #E0B43C 50%, #F4CE5E 100%)' }}/>
+            <span className="relative flex items-center justify-center gap-2 text-[#0E1726]">
+              <span className="text-xl">🎲</span>
+              <span>يلا بينا</span>
+            </span>
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ background: 'linear-gradient(135deg, #F4CE5E 0%, #E0B43C 50%, #F4CE5E 100%)' }}/>
             <span className="relative flex items-center justify-center gap-2 text-[#0E1726]">

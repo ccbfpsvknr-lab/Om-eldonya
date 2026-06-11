@@ -26,6 +26,7 @@ export function toGamePlayers(lobby: LobbyPlayer[], startingCash: number): Playe
     seat,
     position: 0,
     cash: startingCash,
+    isBot: p.isBot ?? false,
     isHost: p.isHost,
     isActive: true,
     laps: 0,

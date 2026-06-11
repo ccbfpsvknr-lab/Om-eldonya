@@ -56,4 +56,11 @@ export const appRoutes: AppRoute[] = [
       import('@/features/winner/WinnerScreen').then((m) => ({ default: m.WinnerScreen })),
     ),
   },
+  {
+    path: ROUTES.auth,
+    label: 'الدخول',
+    Component: lazy(() =>
+      import('@/features/auth/AuthScreen').then((m) => ({ default: m.AuthScreen })),
+    ),
+  },
 ];

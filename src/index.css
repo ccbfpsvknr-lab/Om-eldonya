@@ -127,3 +127,19 @@
     padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
 }
+
+/* ── Small-screen responsive fixes ─────────────────────────── */
+* { box-sizing: border-box; }
+html, body, #root {
+  height: 100%;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+/* Prevent content overflow on very small screens */
+.modal-content { max-height: 85dvh; overflow-y: auto; }
+
+/* Portrait rotate hint animation */
+@keyframes spin-hint {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}

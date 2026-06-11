@@ -16,23 +16,23 @@ export interface ChanceCardDef {
 
 export const CHANCE_CARDS: ChanceCardDef[] = [
   // ---- Money ----
-  { id: 'M1', type: 'money', title: '💵 بقشيش',           text: 'البواب بعتلك بقشيش!',                         amount: 500  },
+  { id: 'M1', type: 'money', title: '💵 بقشيش',           text: 'البواب اداك بقشيش',                         amount: 500  },
   { id: 'M2', type: 'money', title: '⚡ فاتورة كهرباء',    text: 'الكهرباء فاجأتك بفاتورة 😤',                  amount: -300 },
   { id: 'M3', type: 'money', title: '🤝 راهنت',            text: 'راهنت صاحبك وكسبت!',                       amount: 1000 },
-  { id: 'M4', type: 'money', title: '🚦 غرامة مرور',       text: 'الترافيك كتبلك مخالفة يا خرتيت 😂',          amount: -200 },
-  { id: 'M5', type: 'money', title: '💼 مكافأة سنوية',     text: 'المدير راضي عنك... نادراً',                   amount: 800  },
-  { id: 'M6', type: 'money', title: '🔧 إصلاح عربية',      text: 'العربية واقفة، ادفع إيه بقى! 🔧',             amount: -500 },
+  { id: 'M4', type: 'money', title: '🚦 غرامة مرور',       text: 'المرور كتبلك مخالفة يا خرتيت',          amount: -200 },
+  { id: 'M5', type: 'money', title: '💼 مكافأة سنوية',     text: 'المدير راضي عنك… نادرا يعني',                   amount: 800  },
+  { id: 'M6', type: 'money', title: '🔧 إصلاح عربية',      text: 'العربية فتحت بوقها, ايه الجديد؟ 🤦🏻\u200d♂️',             amount: -500 },
   { id: 'M7', type: 'money', title: '🎁 هدية',             text: 'أهلك بعتولك فلوس!',                          amount: 600  },
-  { id: 'M8', type: 'money', title: '🏥 فاتورة دكتور',     text: 'الدكتور أخدها من الآخر 💉',                   amount: -400 },
+  { id: 'M8', type: 'money', title: '🏥 فاتورة دكتور',     text: 'حقنة… بس الحمدلله مش عضل',                   amount: -400 },
   // ---- Movement ----
-  { id: 'V1', type: 'move',  title: '🚂 روح رمسيس',       text: 'يلا بيك على رمسيس 🚂',                        toTile: 0    },
-  { id: 'V2', type: 'move',  title: '⬅️ تراجع شوية',      text: 'الطريق مقفول، ارجع شوية ⬅️',                  spaces: -3   },
-  { id: 'V3', type: 'move',  title: '➡️ قدما!',            text: 'الطريق فاتح، قدّم على طول ➡️',                spaces: 4    },
+  { id: 'V1', type: 'move',  title: '🚂 روح رمسيس',       text: 'يلا على رمسيس',                        toTile: 0    },
+  { id: 'V2', type: 'move',  title: '⬅️ ارجع شوية',      text: 'الطريق مقفول، ارجع شوية ⬅️',                  spaces: -3   },
+  { id: 'V3', type: 'move',  title: '➡️ اجري!',            text: 'الطريق فاضي، دوس بنزين!',                spaces: 4    },
   // ---- Police ----
-  { id: 'P1', type: 'police', title: '🚔 قبض عليك!',      text: 'الباشا شافك وما عجبوش. روح السجن!' },
+  { id: 'P1', type: 'police', title: '🚔 الباشا موده مش رايق',      text: 'شكلك مش عاجبه، روح الحجز!' },
   // ---- Bonus ----
-  { id: 'B1', type: 'bonus', title: '🛡️ حظك بره',         text: 'المرة الجاية الإيجار مش عليك 😏',              freePass: true  },
-  { id: 'B2', type: 'bonus', title: '🎲 دور تاني',         text: 'يومك بختك، ارمي الزهر تاني!',                  rollAgain: true },
+  { id: 'B1', type: 'bonus', title: '🛡️ صاحبك جدع',         text: 'المرة الجاية الإيجار مش عليك 😏',              freePass: true  },
+  { id: 'B2', type: 'bonus', title: '🎲 دور تاني',         text: 'يا بختك، ارمي الزهر تاني',                  rollAgain: true },
   // ---- Government Office ----
   { id: 'G1', type: 'govt',  title: '🏛️ الديوان الحكومي', text: 'الموظف بيفطر وجاي\nدور لوحدك في الكرسي 😂' },
   { id: 'G2', type: 'govt',  title: '💻 السيستم واقع',    text: 'السيستم واقع ومحدش شايل هم.\nدورك الجاي هيتأجل!', skipNextTurn: true },

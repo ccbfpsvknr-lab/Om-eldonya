@@ -11,7 +11,7 @@ export type GamePhase =
   | 'playing' // round in progress
   | 'finished'; // a winner exists
 
-export type GameMode = 'classic' | 'quick' | 'custom';
+export type GameMode = 'classic' | 'quick';
 
 export interface Player {
   id: string;
@@ -24,6 +24,7 @@ export interface Player {
   vehicle: string;
   score: number;
   isHost: boolean;
+  isBot?: boolean;
 }
 
 export interface GameConfig {

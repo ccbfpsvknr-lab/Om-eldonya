@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { ModalRoot } from '@/components/feedback/ModalRoot';
 import { AppRouter } from '@/router';
@@ -8,6 +10,9 @@ import { AppRouter } from '@/router';
  * the router so dialogs can be opened from anywhere.
  */
 export default function App() {
+  const initialize = useAuthStore((s) => s.initialize);
+  useEffect(() => { initialize(); }, [initialize]);
+
   return (
     <ThemeProvider>
       <AppRouter />

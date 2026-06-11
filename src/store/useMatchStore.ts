@@ -314,7 +314,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
   takeSalfa: (playerId) => set((s) => {
     if (!s.game) return s;
     const p = s.game.players.find((p) => p.id === playerId);
-    if (!p || p.solfaCount >= 3) return s; // max 3 solfas per game
+    if (!p || p.solfaCount >= 1) return s; // max 3 solfas per game
     const players = s.game.players.map((pl) =>
       pl.id === playerId ? {
         ...pl, cash: pl.cash + SALFA_AMOUNT,
@@ -361,12 +361,16 @@ export const useMatchStore = create<MatchState>((set, get) => ({
   drawAndApplyChanceCard: () => {
     const game = get().game;
     if (!game) return null;
+    // After 20 minutes: only negative money cards (accelerate endgame)
+    const elapsedMs = Date.now() - (game.startedAt ?? Date.now());
+    const lateGame = elapsedMs >= 20 * 60 * 1000; // 20 min in ms
 
-    // Infinite random pool — cards never deplete, every draw is fresh random
+    // After 20 min in classic: only negative money cards — forces game to end
+    const LATE_POOL  = ['M2','M4','M6','M8']; // -300, -200, -500, -400
     const isFast = game.mode === 'quick';
-    const FAST_POOL = ['M1','M2','M3','M4','M5','M6','M7','M8','V1','V2','V3','B2'];
-    const FULL_POOL = ['M1','M2','M3','M4','M5','M6','M7','M8','V1','V2','V3','P1','B1','B2','G1','G2','G3'];
-    const pool = isFast ? FAST_POOL : FULL_POOL;
+    const FAST_POOL  = ['M1','M2','M3','M4','M5','M6','M7','M8','V1','V2','V3','B2'];
+    const FULL_POOL  = ['M1','M2','M3','M4','M5','M6','M7','M8','V1','V2','V3','P1','B1','B2','G1','G2','G3'];
+    const pool = (!isFast && lateGame) ? LATE_POOL : (isFast ? FAST_POOL : FULL_POOL);
     const cardId = pool[Math.floor(Math.random() * pool.length)];
     const card = getCard(cardId);
 

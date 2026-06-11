@@ -13,6 +13,7 @@ export function PlayerSetup() {
   const players     = usePlayersStore((s) => s.players);
   const addPlayer   = usePlayersStore((s) => s.addPlayer);
   const removePlayer = usePlayersStore((s) => s.removePlayer);
+  const toggleBot    = usePlayersStore((s) => s.toggleBot);
   const canStart    = usePlayersStore(selectCanStart);
   const setPhase    = useGameStore((s) => s.setPhase);
   const mode        = useGameStore((s) => s.config.mode);
@@ -81,7 +82,7 @@ export function PlayerSetup() {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="أو اتركه فارغ علشان اسم عشوائي"
+                  placeholder="او سيبه فاضي، و تاخد اسم عشوائي"
                   maxLength={20}
                   autoComplete="off"
                   className="flex-1 rounded-xl border border-[rgba(56,74,110,0.6)] bg-[rgba(22,34,58,0.8)] px-3 py-2.5 text-sm text-[#EADBB7] placeholder-[rgba(154,166,188,0.5)] outline-none focus:border-[rgba(224,180,60,0.5)]"
@@ -145,7 +146,7 @@ export function PlayerSetup() {
               مفيش لاعبين لسه
             </p>
             <p className="text-xs text-[#9AA6BC] text-center max-w-[200px]">
-              ضيف الأسامي، أو اتركها فارغة وهنديلك اسم مصري 😄
+              ضيف الاسامي، او سيبها فاضية و هنديلك اسم مصري 😂
             </p>
           </div>
         ) : (
@@ -154,8 +155,8 @@ export function PlayerSetup() {
               <div key={p.id}
                 className="flex items-center gap-3 rounded-2xl overflow-hidden animate-scale-in"
                 style={{
-                  background: 'rgba(14,23,38,0.85)',
-                  border: '1px solid rgba(56,74,110,0.5)',
+                  background: p.isBot ? 'rgba(30,20,50,0.85)' : 'rgba(14,23,38,0.85)',
+                  border: p.isBot ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(56,74,110,0.5)',
                 }}>
                 {/* Color stripe */}
                 <div className="w-1 self-stretch" style={{ background: p.color }}/>
@@ -173,7 +174,7 @@ export function PlayerSetup() {
                     {p.name}
                   </p>
                   <p className="text-[10px] text-[#9AA6BC]">
-                    لاعب {idx + 1}
+                    {p.isBot ? '🤖 بوت' : `لاعب ${idx + 1}`}
                     {p.isHost && ' • المضيف'}
                   </p>
                 </div>
@@ -186,9 +187,21 @@ export function PlayerSetup() {
                   </span>
                 )}
 
+                {/* Bot toggle */}
+                <button onClick={() => toggleBot(p.id)}
+                  title={p.isBot ? 'تحويل لاعب حقيقي' : 'تحويل لبوت'}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg transition-all active:scale-90 text-sm"
+                  style={{
+                    background: p.isBot ? 'rgba(99,102,241,0.2)' : 'rgba(56,74,110,0.3)',
+                    border: p.isBot ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(56,74,110,0.4)',
+                    color: p.isBot ? '#A5B4FC' : '#9AA6BC',
+                  }}>
+                  {p.isBot ? '🤖' : '👤'}
+                </button>
+
                 {/* Remove */}
                 <button onClick={() => handleRemove(p.id, p.name)}
-                  className="ml-2 mr-3 flex h-7 w-7 items-center justify-center rounded-lg text-[#9AA6BC] hover:text-[#E05656] transition-colors text-sm">
+                  className="mr-3 flex h-7 w-7 items-center justify-center rounded-lg text-[#9AA6BC] hover:text-[#E05656] transition-colors text-sm">
                   ✕
                 </button>
               </div>

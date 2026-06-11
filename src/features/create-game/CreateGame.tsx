@@ -33,18 +33,6 @@ const MODES: {
     bg: 'linear-gradient(135deg, rgba(2,22,18,0.95) 0%, rgba(2,12,10,0.98) 100%)',
     border: 'rgba(42,157,143,0.6)',
   },
-  {
-    id: 'custom',
-    title: 'مخصصة',
-    tagline: 'رحلة مصر الكاملة',
-    icon: '🗺️',
-    features: ['٤٠ خانة', 'أخبار وأحداث', 'كل الميزات'],
-    tiles: 40,
-    accent: '#9333EA',
-    glow: 'rgba(147,51,234,0.35)',
-    bg: 'linear-gradient(135deg, rgba(16,4,28,0.95) 0%, rgba(8,2,16,0.98) 100%)',
-    border: 'rgba(147,51,234,0.6)',
-  },
 ];
 
 /* ─── Main component ────────────────────────────────────────────────────────── */
@@ -53,7 +41,7 @@ export function CreateGame() {
   const config      = useGameStore((s) => s.config);
   const setMode     = useGameStore((s) => s.setMode);
   const updateConfig = useGameStore((s) => s.updateConfig);
-  const modeMax = config.mode === 'quick' ? 3 : 4;   // fast=3, classic/custom=4
+  const modeMax = config.mode === 'quick' ? 3 : 4;
 
   const selectedMode = MODES.find((m) => m.id === config.mode) ?? MODES[0];
 
@@ -97,15 +85,15 @@ export function CreateGame() {
           return (
             <button
               key={mode.id}
-              onClick={() => mode.id !== 'custom' && setMode(mode.id)}
+              onClick={() => setMode(mode.id)}
               className="relative w-full overflow-hidden rounded-2xl text-right transition-all duration-300"
               style={{
                 background: mode.bg,
                 border: `1.5px solid ${active ? mode.accent : 'rgba(56,74,110,0.4)'}`,
                 boxShadow: active ? `0 0 24px ${mode.glow}, 0 4px 16px rgba(0,0,0,0.4)` : '0 2px 12px rgba(0,0,0,0.3)',
                 transform: active ? 'scale(1.01)' : 'scale(1)',
-                opacity: mode.id === 'custom' ? 0.5 : 1,
-                cursor: mode.id === 'custom' ? 'not-allowed' : 'pointer',
+                opacity: 1,
+                cursor: 'pointer',
               }}
             >
               {/* Card inner */}
@@ -214,7 +202,7 @@ export function CreateGame() {
             boxShadow: `0 4px 20px ${selectedMode.glow}, 0 1px 0 rgba(255,255,255,0.15) inset`,
             fontFamily: "'Cairo', sans-serif",
             fontSize: '1.1rem',
-            color: selectedMode.id === 'custom' ? '#fff' : '#0E1726',
+            color: '#0E1726',
           }}>
           <span className="flex items-center justify-center gap-2">
             <span>يلا نختار اللاعبين</span>

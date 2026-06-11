@@ -1,6 +1,6 @@
 import type { GameMode } from '@/types';
 
-export type BoardSize = 'fast' | 'regular' | 'full';
+export type BoardSize = 'fast' | 'regular';
 
 export type TileType =
   | 'ramses'
@@ -58,6 +58,7 @@ export interface Player {
   seat: number;
   position: number;
   cash: number;
+  isBot: boolean;
   isHost: boolean;
   isActive: boolean;
   laps: number;

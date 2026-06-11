@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Badge } from '@/components/ui';
 import { useModal } from '@/hooks/useModal';
@@ -73,7 +73,7 @@ const CITY_EMOJI: Record<string, string> = {
 };
 
 const CORNER_STYLE: Record<string, { bg: string; icon: string; label: string }> = {
-  ramses: { bg: 'linear-gradient(135deg, #2d7a1e, #1a5210)', icon: '🏁', label: 'ابدأ' },
+  ramses: { bg: 'linear-gradient(135deg, #2d7a1e, #1a5210)', icon: '🏁', label: 'محطة رمسيس' },
   jail:   { bg: 'linear-gradient(135deg, #7a1a1a, #501010)', icon: '🔒', label: 'الحجز' },
   rest:   { bg: 'linear-gradient(135deg, #7a4a10, #503008)', icon: '☕', label: 'القهوة' },
   police: { bg: 'linear-gradient(135deg, #8a1010, #600808)', icon: '🚔', label: 'كمين' },
@@ -94,6 +94,29 @@ const cashEmoji = (n: number): string =>
 export function GameBoard() {
   const navigate   = useNavigate();
   const { confirm, open, close } = useModal();
+
+  // ── 20-min late-game tracker ─────────────────────────────────────────────
+  const [lateGame, setLateGame] = useState(false);
+  useEffect(() => {
+    if (!game?.startedAt || game.mode === 'quick' || lateGame) return;
+    const remaining = 20 * 60 * 1000 - (Date.now() - game.startedAt);
+    if (remaining <= 0) { setLateGame(true); return; }
+    const t = setTimeout(() => setLateGame(true), remaining);
+    return () => clearTimeout(t);
+  }, [game?.startedAt, game?.mode, lateGame]);
+
+  // ── Portrait detection ────────────────────────────────────────────────────
+  const [isPortrait, setIsPortrait] = useState(
+    () => window.innerHeight > window.innerWidth
+  );
+  useEffect(() => {
+    const onResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); };
+  }, []);
+
+
 
   const game             = useMatchStore(selectGame);
   const cp               = useMatchStore(selectCurrentPlayer);
@@ -201,6 +224,50 @@ export function GameBoard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.currentPlayerIndex, game?.phase]);
 
+
+  // ── Bot automation ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
+
+    if (phase === 'rolling') {
+      // Bot "thinks" then rolls
+      const t = setTimeout(() => {
+        const g2 = useMatchStore.getState().game;
+        if (g2?.players[g2.currentPlayerIndex]?.isBot) handleRoll();
+      }, 700 + Math.random() * 500);
+      return () => clearTimeout(t);
+    }
+
+    if (phase === 'turn-end' && openModalCount === 0 && !rollAgainPending) {
+      // Bot considers upgrading before ending turn
+      const t = setTimeout(() => {
+        const g2 = useMatchStore.getState().game;
+        const cur = g2?.players[g2?.currentPlayerIndex ?? -1];
+        if (!g2 || !cur?.isBot) return;
+        // Upgrade: own full region, can afford, hasn't upgraded yet
+        if (!g2.hasUpgradedThisTurn) {
+          const cities = Object.values(g2.cities);
+          for (const city of cities) {
+            if (city.ownerId !== cur.id) continue;
+            if (canUpgrade(g2, city, cur.id)) {
+              const cost = getUpgradeCost(city);
+              if (cur.cash > cost * 1.6 && Math.random() < 0.45) {
+                upgradeCity(city.id);
+                break;
+              }
+            }
+          }
+        }
+        setTimeout(() => {
+          const g3 = useMatchStore.getState().game;
+          if (g3?.players[g3.currentPlayerIndex]?.isBot) handleEndTurn();
+        }, 400);
+      }, 600);
+      return () => clearTimeout(t);
+    }
+  }, [phase, cp?.isBot, isMoving, diceRolling, openModalCount, rollAgainPending,
+      handleRoll, handleEndTurn, upgradeCity, game]);
+
   const handleQuit = async () => {
     const ok = await confirm({ title: 'إنهاء اللعبة', message: 'لو خرجت دلوقتي، اللعبة راحت مع الريح. متأكد؟', confirmLabel: 'اخرج', danger: true });
     if (ok) { resetMatch(); resetGame(); resetPlayers(); navigate(ROUTES.home); }
@@ -274,6 +341,12 @@ export function GameBoard() {
   }, [open, close, bankruptPlayer, showToast, endTurn]);
 
   // ── Landing ───────────────────────────────────────────────────────────────
+
+  // Helper: find jail tile index on current board
+  const jailIndex = useMemo(() =>
+    game.board.findIndex((t) => t.type === 'jail'),
+  [game.board]);
+
   const resolveLanding = useCallback(() => {
     const g = useMatchStore.getState().game;
     if (!g) return;
@@ -281,25 +354,56 @@ export function GameBoard() {
     if (!player) return;
     const tile = g.board[player.position];
     if (!tile) return;
+    const isCurrentBot = player.isBot ?? false;
 
-    if (tile.type === 'city' && tile.cityId) {
+
+    if (tile.type === 'ramses' && !isFast) {
+      // Classic: salary already applied by movePlayer.
+      // Human: show popup. Bot: skip popup silently.
+      if (!isCurrentBot) {
+        let rid = '';
+        rid = open(
+          <div className="text-center space-y-4" dir="rtl">
+            <div className="text-6xl">🚂</div>
+            <h2 className="text-3xl font-extrabold text-gold-sheen">محطة رمسيس!</h2>
+            <p className="text-muted text-sm">استلمت مرتبك يا كابتن</p>
+            <p className="text-2xl font-extrabold text-gold">
+              +{cashEmoji(800)}{(800).toLocaleString('en-US')}
+            </p>
+            <Button block size="lg" onClick={() => close(rid)}>يلا نكمل 🚀</Button>
+          </div>,
+          { size: 'sm', hideClose: true, dismissable: false }
+        );
+      }
+
+    } else if (tile.type === 'city' && tile.cityId) {
       const city = g.cities[tile.cityId];
       if (!city) return;
       if (city.ownerId === null) {
-        let mid = '';
-        mid = open(
-          <BuyCityModal city={city} canAfford={player.cash >= city.price}
-            onBuy={() => {
-              buyCity(city.id); close(mid);
-              const after = useMatchStore.getState().game;
-              if (after && isRegionComplete(after, city.region, player.id)) {
-                showToast(<div className="text-center"><div className="text-4xl mb-2">🔥</div><h3 className="text-xl text-gold-sheen">يا سلام! كملت المنطقة 🏆</h3><p className="text-sm text-content mt-1">الإيجار بقى الضعف دلوقتي</p></div>);
-              }
-            }}
-            onPass={() => close(mid)}
-          />,
-          { size: 'sm', hideClose: true, dismissable: false }
-        );
+        if (isCurrentBot) {
+          if (player.cash >= city.price * 1.2) {
+            buyCity(city.id);
+            showToast(<div className="text-center" dir="rtl">
+              <div className="text-2xl mb-1">{CITY_EMOJI[city.name] ?? '🏙️'}</div>
+              <p className="text-sm font-bold text-gold-sheen">{city.name} — اشتراها البوت 🤖</p>
+            </div>, 1400);
+          }
+        } else {
+          let mid = '';
+          mid = open(
+            <BuyCityModal city={city} canAfford={player.cash >= city.price}
+              onBuy={() => {
+                buyCity(city.id); close(mid);
+                const after = useMatchStore.getState().game;
+                if (after && isRegionComplete(after, city.region, player.id)) {
+                  showToast(<div className="text-center"><div className="text-4xl mb-2">🔥</div><h3 className="text-xl text-gold-sheen">يا سلام! كملت المنطقة 🏆</h3><p className="text-sm text-content mt-1">الإيجار بقى الضعف دلوقتي</p></div>);
+                }
+              }}
+              onPass={() => close(mid)}
+            />,
+            { size: 'sm', hideClose: true, dismissable: false }
+          );
+        }
       } else if (city.ownerId !== player.id) {
         const tx = payRent(city.id);
         if (tx) {
@@ -317,23 +421,70 @@ export function GameBoard() {
       }
 
     } else if (tile.type === 'police') {
-      // All modes: land on police = go to jail
-      goToJail(player.id);
+      const jailIdx = jailIndex >= 0 ? jailIndex : (isFast ? 5 : 7);
+      const bLen    = g.board.length;
+      const fromPos = player.position;
+      const pid2    = player.id;
       let pid = '';
-      pid = open(
-        <div className="text-center space-y-5">
-          <div className="text-8xl">🚔</div>
-          <h2 className="text-4xl font-extrabold text-gold-sheen">كلابوووش!</h2>
-          <p className="text-muted">يلا عالبوكس! 🚔</p>
-          <Button block size="lg" onClick={() => close(pid)}>حاضر يا باشا 🫡</Button>
-        </div>,
-        { size: 'sm', hideClose: true, dismissable: false }
-      );
+      const onJailConfirm = () => {
+        close(pid);
+        goToJail(pid2);
+        const steps = ((jailIdx - fromPos) % bLen + bLen) % bLen || bLen;
+        animateAndMove(fromPos, steps, bLen, 0, () => {}); // animate to jail, no salary
+      };
+      if (isCurrentBot) {
+        // Bot: go to jail silently + animate
+        onJailConfirm();
+      } else {
+        pid = open(
+          <div className="text-center space-y-5">
+            <div className="text-8xl">🚔</div>
+            <h2 className="text-4xl font-extrabold text-gold-sheen">كلابوووش!</h2>
+            <p className="text-muted">يلا عالبوكس! 🚔</p>
+            <Button block size="lg" onClick={onJailConfirm}>حاضر يا باشا 🫡</Button>
+          </div>,
+          { size: 'sm', hideClose: true, dismissable: false }
+        );
+      }
 
         } else if (tile.type === 'chance') {
       const result = drawChance();
       if (!result) return;
       const card = getCard(result.cardId);
+      // Bot: apply effects silently without modal
+      if (isCurrentBot) {
+        if (card.skipNextTurn) { markSkipTurn(player.id); }
+        else if (card.type === 'move') {
+          const g2b = useMatchStore.getState().game;
+          const cur2 = g2b?.players[g2b.currentPlayerIndex];
+          if (cur2 && g2b) {
+            const bLen = g2b.board.length;
+            const steps = card.toTile !== undefined
+              ? ((card.toTile - cur2.position + bLen) % bLen)
+              : (card.spaces ?? 0);
+            if (steps !== 0) {
+              const cashB = cur2.cash;
+              movePlayer(steps);
+              const after2 = useMatchStore.getState().game?.players[g2b.currentPlayerIndex];
+              const sal2 = Math.max(0, (after2?.cash ?? cashB) - cashB);
+              animateAndMove(cur2.position, steps, bLen, sal2);
+            }
+          }
+        } else if (card.type === 'police') {
+          const g3b = useMatchStore.getState().game;
+          const jIdx2 = g3b?.board.findIndex((t) => t.type === 'jail') ?? 7;
+          const bLen2 = g3b?.board.length ?? 24;
+          const from3 = player.position;
+          goToJail(player.id);
+          const steps3 = ((jIdx2 - from3) % bLen2 + bLen2) % bLen2 || bLen2;
+          animateAndMove(from3, steps3, bLen2, 0, () => {});
+        } else if (card.type === 'bonus' && card.rollAgain) {
+          setRollAgainPending(true);
+        } else if ((card.type === 'money' || card.type === 'govt') && card.amount && card.amount < 0) {
+          checkInsolvency(player.id);
+        }
+      } else {
+
       let cid = '';
       cid = open(
         <div className="space-y-4 text-center">
@@ -366,7 +517,13 @@ export function GameBoard() {
               const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
               animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
             } else if (card.type === 'police') {
-              if (!isFast) goToJail(player.id); // police card never in fast deck anyway
+              const g3    = useMatchStore.getState().game;
+              const jIdx  = g3?.board.findIndex((t) => t.type === 'jail') ?? 7;
+              const bLen2 = g3?.board.length ?? 24;
+              const from2 = player.position;
+              goToJail(player.id);
+              const steps2 = ((jIdx - from2) % bLen2 + bLen2) % bLen2 || bLen2;
+              animateAndMove(from2, steps2, bLen2, 0, () => {}); // animate to jail, no salary
             } else if (card.type === 'bonus' && card.rollAgain) {
               setRollAgainPending(true);
             } else if ((card.type === 'money' || card.type === 'govt') && card.amount && card.amount < 0) {
@@ -378,11 +535,12 @@ export function GameBoard() {
         </div>,
         { size: 'sm', dismissable: false, hideClose: true }
       );
+      } // end human chance modal
 
     } else if (tile.type === 'news') {
       const NEWS_POOL = [
         { icon:'🛢️', title:'أسعار البنزين ولعت!',    sub:'كل واحد فيكم هيدفع ١٥٠ جنيه… يعني هتمشوا على رجليكم من دلوقتي 😭',  effect:'allPay',            amount:150 },
-        { icon:'📈', title:'البورصة في الطالع!',       sub:'الأغنى واحد يكسب ٦٠٠ جنيه… المستثمرين بيعيطوا من الفرحة 🤑',       effect:'richestGain',       amount:600 },
+        { icon:'📈', title:'البورصة في الطالع!',       sub:'أغنى واحد يكسب ٦٠٠ جنيه… المستثمرين بيعيطوا من الفرحة 🤑',       effect:'richestGain',       amount:600 },
         { icon:'📉', title:'أزمة اقتصادية يا جماعة!', sub:'الجنيه وقع في الأرض وبص للسما… كل لاعب يدفع ١٠٪ من رصيده 😩',     effect:'allPayPercent',     amount:10  },
         { icon:'💰', title:'الحكومة رفعت الأجور!',    sub:'ربنا يكرّمهم… كل لاعب يكسب ٢٠٠ جنيه مكافأة 😁',                    effect:'allGain',           amount:200 },
         { icon:'🏗️', title:'فساد في المناقصات!',      sub:'القضية مش هتكمل بكره… الأغنى يدفع ٥٠٠ للأفقر 😂',                  effect:'richestPaysPoarest',amount:500 },
@@ -420,6 +578,11 @@ export function GameBoard() {
         let govModalId = '';
         const onWait = () => { markSkipTurn(pid); close(govModalId); };
         const onPay  = () => { payAmount(300); checkInsolvency(pid); close(govModalId); };
+        if (isCurrentBot) {
+          // Bot: pay if affordable, else skip turn
+          if (canAffordBribe) { payAmount(300); checkInsolvency(pid); }
+          else { markSkipTurn(pid); }
+        } else {
         govModalId = open(
           <div className="space-y-4 text-center" dir="rtl">
             <div className="text-5xl">🏛️</div>
@@ -447,15 +610,17 @@ export function GameBoard() {
           </div>,
           { size: 'sm', hideClose: true, dismissable: false }
         );
-      } else if (tile.name === 'شركة المياه') {
+        } // end human diwan modal
+      } // end الديوان المحلي
+      else if (tile.name === 'شركة المياه') {
         const bill = 150;
         payAmount(bill);
-        showToast(<div className="text-center"><div className="text-4xl mb-2">💧</div><h3 className="text-xl text-gold-sheen">شركة المياه</h3><p className="text-sm text-content mt-1">وصلتك فاتورة المياه يا أخي!</p><p className="text-lg font-extrabold text-clay mt-1">−{cashEmoji(bill)}{bill.toLocaleString('en-US')}</p></div>);
+        showToast(<div className="text-center"><div className="text-4xl mb-2">💧</div><h3 className="text-xl text-gold-sheen">شركة المياه</h3><p className="text-sm text-content mt-1">وصلتك فاتورة المياة!</p><p className="text-lg font-extrabold text-clay mt-1">−{cashEmoji(bill)}{bill.toLocaleString('en-US')}</p></div>);
         checkInsolvency(player.id);
       } else if (tile.name === 'شركة الكهرباء') {
         const bill = Math.min(Math.max(Math.round(player.cash * 0.10), 200), 2000);
         payAmount(bill);
-        showToast(<div className="text-center"><div className="text-4xl mb-2">⚡</div><h3 className="text-xl text-gold-sheen">شركة الكهرباء</h3><p className="text-sm text-content mt-1">فاتورتك وصلت… وده اللي أنت فيه 😬</p><p className="text-lg font-extrabold text-clay mt-1">−{cashEmoji(bill)}{bill.toLocaleString('en-US')}</p></div>);
+        showToast(<div className="text-center"><div className="text-4xl mb-2">⚡</div><h3 className="text-xl text-gold-sheen">شركة الكهرباء</h3><p className="text-sm text-content mt-1">فاتورتك وصلت… ادفع!</p><p className="text-lg font-extrabold text-clay mt-1">−{cashEmoji(bill)}{bill.toLocaleString('en-US')}</p></div>);
         checkInsolvency(player.id);
       } else if (tile.name === 'المحكمة الاقتصادية') {
         const activePlayers = g.players.filter(p => p.isActive);
@@ -491,8 +656,8 @@ export function GameBoard() {
       isFast, game]);
 
   // ── Movement animation ────────────────────────────────────────────────────
-  const animateAndMove = useCallback((from: number, steps: number, boardLen: number, salary: number) => {
-    if (steps === 0) { resolveLanding(); return; }
+  const animateAndMove = useCallback((from: number, steps: number, boardLen: number, salary: number, onDone?: () => void) => {
+    if (steps === 0) { if (onDone) { onDone(); } else { resolveLanding(); } return; }
     const dir = steps > 0 ? 1 : -1;
     const absSteps = Math.abs(steps);
     setIsMoving(true);
@@ -520,8 +685,7 @@ export function GameBoard() {
               <p className="text-xl font-extrabold text-gold mt-1">+{salary.toLocaleString('en-US')} جنيه</p>
             </div>
           );
-          resolveLanding();   // open modal first (if any)
-          setIsMoving(false); // then allow auto-end guard to pass
+          if (onDone) { onDone(); setIsMoving(false); } else { resolveLanding(); setIsMoving(false); }
         }, 150);
       }
     }, 350);
@@ -1062,7 +1226,7 @@ export function GameBoard() {
                         {canSell && (
                           <button onClick={openSellModal} style={{ flex: 1, borderRadius: '5px', padding: (isFastBoard||isClassicRect)?'5px':'2px', fontSize: (isFastBoard||isClassicRect)?'10px':'7px', fontWeight: 700, background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)', color: '#C75B39', cursor: 'pointer' }}>🏦 بيع للبنك</button>
                         )}
-                        {canEnd && (
+                        {canEnd && !rollAgainPending && (
                           <button onClick={handleEndTurn} style={{ flex: 1, borderRadius: '5px', padding: isFastBoard?'5px':'2px', fontSize: isFastBoard?'10px':'7px', fontWeight: 700, background: 'rgba(224,180,60,0.15)', border: '1px solid rgba(224,180,60,0.4)', color: '#E0B43C', cursor: 'pointer' }}>يلا ←</button>
                         )}
                       </div>
@@ -1426,7 +1590,7 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
   const ownedCities = game ? Object.values(game.cities).filter((c) => c.ownerId === playerId) : [];
   useEffect(() => { if (player && player.cash >= 0) onClose(); }, [player?.cash, onClose]);
   if (!player || !game || player.cash >= 0) return null;
-  const canTakeSalfa = player.cash + SALFA_AMOUNT >= 0 && (player.solfaCount ?? 0) < 3;
+  const canTakeSalfa = player.cash + SALFA_AMOUNT >= 0 && (player.solfaCount ?? 0) < 1;
   const hasOptions   = canTakeSalfa || ownedCities.length > 0;
   return (
     <div className="space-y-4" dir="rtl">
@@ -1443,7 +1607,7 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
           <button onClick={() => takeSalfa(playerId)} style={{ width: '100%', padding: '10px', borderRadius: '10px',
             background: 'linear-gradient(135deg, rgba(42,157,143,0.3), rgba(42,157,143,0.15))', border: '1px solid rgba(42,157,143,0.5)',
             color: '#2A9D8F', fontFamily: "'Cairo'", fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}>
-            💳 اسلف {SALFA_AMOUNT.toLocaleString('en-US')} من البنك
+            💳 استلف {SALFA_AMOUNT.toLocaleString('en-US')} من البنك
           </button>
         </div>
       )}
@@ -1486,158 +1650,6 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
   );
 }
 
-// ─── GOVERNMENT OFFICE MODAL ─────────────────────────────────────────────────
-function GovOfficeModal({ tileName, player, allPlayers, onDone, payAmount, transferBetweenPlayers, checkInsolvency }: {
-  tileName: string;
-  player: Player;
-  allPlayers: Player[];
-  onDone: (action: string) => void;
-  payAmount: (amount: number) => number;
-  transferBetweenPlayers: (fromId: string, toId: string, amount: number) => void;
-  checkInsolvency: (id: string) => void;
-}) {
-  const activePlayers = allPlayers.filter((p) => p.isActive);
-  const myCities = Object.keys({}).length; // placeholder — resolved below
-
-  if (tileName === 'الديوان المحلي') {
-    const canAffordBribe = player.cash >= 300;
-    return (
-      <div className="space-y-4 text-center" dir="rtl">
-        <div className="text-5xl">🏛️</div>
-        <h3 className="text-2xl font-extrabold text-gold-sheen">الديوان المحلي</h3>
-        <p className="text-sm text-content leading-relaxed">
-          الموظف مش موجود… السيستم واقع… والأوراق ضاعت 😤<br/>
-          تدفع ولا تستنى؟
-        </p>
-        <div className="flex gap-3">
-          <button onClick={() => { onDone('skip'); }}
-            className="flex-1 rounded-xl py-3 text-sm font-bold"
-            style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC' }}>
-            استنى الدور الجاي 😤
-          </button>
-          <button disabled={!canAffordBribe}
-            onClick={() => { payAmount(300); checkInsolvency(player.id); onDone('paid'); }}
-            className="flex-1 rounded-xl py-3 text-sm font-bold"
-            style={{
-              background: canAffordBribe ? 'linear-gradient(135deg,#E8C040,#C49020)' : 'rgba(56,74,110,0.3)',
-              color: canAffordBribe ? '#0E1726' : '#9AA6BC',
-              border: 'none', cursor: canAffordBribe ? 'pointer' : 'not-allowed',
-            }}>
-            {canAffordBribe ? 'بلّط! ادفع ٣٠٠ 💸' : 'الجيب فاضي 😅'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (tileName === 'شركة المياه') {
-    const cities = allPlayers.find(p => p.id === player.id)?.id; // just to scope
-    // count player's cities from game state via allPlayers is not available directly —
-    // use payAmount hook logic: bill = max(150, cityCount * 150)
-    // We pass player but not game cities, so show flat 150 per turn
-    const bill = 150;
-    return (
-      <div className="space-y-4 text-center" dir="rtl">
-        <div className="text-5xl">💧</div>
-        <h3 className="text-2xl font-extrabold text-gold-sheen">شركة المياه</h3>
-        <p className="text-sm text-content leading-relaxed">
-          وصلتك فاتورة المياه يا أخي!<br/>
-          وماعدش فيه كلام 😶
-        </p>
-        <p className="text-xl font-extrabold text-clay">{cashEmoji(bill)}−{bill.toLocaleString('en-US')}</p>
-        <button onClick={() => { payAmount(bill); checkInsolvency(player.id); onDone('paid'); }}
-          className="w-full rounded-xl py-3 font-bold text-sm"
-          style={{ background: 'linear-gradient(135deg,#1E6FA0,#155080)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-          أمر… ادفع 💧
-        </button>
-      </div>
-    );
-  }
-
-  if (tileName === 'المحكمة الاقتصادية') {
-    const sorted = [...activePlayers].sort((a, b) => b.cash - a.cash);
-    const richest = sorted[0];
-    const poorest = sorted[sorted.length - 1];
-    const amount  = 400;
-    const iAmRichest = richest?.id === player.id;
-    const iAmPoorest = poorest?.id === player.id;
-    const samePlayer = richest?.id === poorest?.id;
-    return (
-      <div className="space-y-4 text-center" dir="rtl">
-        <div className="text-5xl">⚖️</div>
-        <h3 className="text-2xl font-extrabold text-gold-sheen">المحكمة الاقتصادية</h3>
-        <p className="text-sm text-content leading-relaxed">
-          القضية: توزيع الثروة في الحي
-        </p>
-        {samePlayer ? (
-          <p className="text-sm text-muted">لاعب واحد بس؟ القاضي قال خلاص 😂</p>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-content">
-              {iAmRichest
-                ? `أنت الأغنى في الشارع ده، ادفع ${amount} للأفقر 😬`
-                : iAmPoorest
-                  ? `أنت الأفقر دلوقتي، خد ${amount} من الأغنى 🤑`
-                  : `القاضي حكم: ${richest?.name} يدفع ${amount} لـ ${poorest?.name}`
-              }
-            </p>
-            <div className="flex justify-center gap-4 text-xs text-muted">
-              <span>الأغنى: {richest?.name} ({richest?.cash.toLocaleString('en-US')})</span>
-              <span>الأفقر: {poorest?.name} ({poorest?.cash.toLocaleString('en-US')})</span>
-            </div>
-          </div>
-        )}
-        <button onClick={() => {
-          if (!samePlayer && richest && poorest) {
-            transferBetweenPlayers(richest.id, poorest.id, amount);
-            if (iAmRichest) checkInsolvency(richest.id);
-          }
-          onDone('done');
-        }}
-          className="w-full rounded-xl py-3 font-bold text-sm"
-          style={{ background: 'linear-gradient(135deg,#7C3AED,#5B21B6)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-          يا ريتني كنت فاهم القانون 😂
-        </button>
-      </div>
-    );
-  }
-
-  if (tileName === 'شركة الكهرباء') {
-    const pct   = 0.10;
-    const raw   = Math.round(player.cash * pct);
-    const bill  = Math.min(Math.max(raw, 200), 2000);
-    return (
-      <div className="space-y-4 text-center" dir="rtl">
-        <div className="text-5xl">⚡</div>
-        <h3 className="text-2xl font-extrabold text-gold-sheen">شركة الكهرباء</h3>
-        <p className="text-sm text-content leading-relaxed">
-          فاتورتك وصلت… وده اللي أنت فيه 😬<br/>
-          ١٠٪ من رصيدك
-        </p>
-        <p className="text-xl font-extrabold text-clay">{cashEmoji(bill)}−{bill.toLocaleString('en-US')}</p>
-        <button onClick={() => { payAmount(bill); checkInsolvency(player.id); onDone('paid'); }}
-          className="w-full rounded-xl py-3 font-bold text-sm"
-          style={{ background: 'linear-gradient(135deg,#C49020,#8B6010)', color: '#0E1726', border: 'none', cursor: 'pointer' }}>
-          إيه اللي أنا فيه ده 😭
-        </button>
-      </div>
-    );
-  }
-
-  // Fallback for unknown project tiles
-  return (
-    <div className="space-y-4 text-center" dir="rtl">
-      <div className="text-5xl">🏗️</div>
-      <h3 className="text-2xl font-extrabold text-gold-sheen">{tileName}</h3>
-      <p className="text-sm text-muted">مشروع تحت الإنشاء 👷</p>
-      <button onClick={() => onDone('done')}
-        className="w-full rounded-xl py-3 font-bold text-sm"
-        style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC', cursor: 'pointer' }}>
-        خلاص
-      </button>
-    </div>
-  );
-}
 
 // ─── SELL TO BANK MODAL ──────────────────────────────────────────────────────
 function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string; onClose: () => void }) {
@@ -1650,6 +1662,24 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
 
   return (
     <div className="space-y-4" dir="rtl">
+      {/* ── Portrait overlay — ask user to rotate ── */}
+      {isPortrait && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: '#0E1726',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Cairo', sans-serif", textAlign: 'center', padding: 24,
+          gap: 16,
+        }}>
+          <div style={{ fontSize: 72 }}>📱</div>
+          <h2 style={{ fontSize: 28, fontWeight: 800, color: '#E0B43C', margin: 0 }}>دوّر الشاشة!</h2>
+          <p style={{ fontSize: 16, color: '#9AA6BC', margin: 0, maxWidth: 260 }}>
+            اللعبة بتشتغل أحسن في الوضع الأفقي
+          </p>
+          <div style={{ fontSize: 40 }}>🔄</div>
+        </div>
+      )}
       <div className="text-center">
         <div className="text-5xl mb-1">🏦</div>
         <h3 className="text-2xl font-extrabold text-gold-sheen">بيع للبنك</h3>

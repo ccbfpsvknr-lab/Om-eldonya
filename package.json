@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "أم الدنيا — Arabic RTL Egyptian-themed multiplayer board game (in development).",
+  "description": "\u0623\u0645 \u0627\u0644\u062f\u0646\u064a\u0627 \u2014 Arabic RTL Egyptian-themed multiplayer board game (in development).",
   "engines": {
     "node": ">=18"
   },
@@ -18,7 +18,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
-    "zustand": "^4.5.5"
+    "zustand": "^4.5.5",
+    "@supabase/supabase-js": "^2.49.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",

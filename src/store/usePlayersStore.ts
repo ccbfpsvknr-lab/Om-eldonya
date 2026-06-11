@@ -11,12 +11,14 @@ interface PlayersState {
   renamePlayer: (id: string, name: string) => void;
   setHost: (id: string) => void;
   resetPlayers: () => void;
+  toggleBot: (id: string) => void;
 }
 
 function nextColor(index: number): string {
   return PLAYER_COLORS[index % PLAYER_COLORS.length];
 }
 
+const BOT_NAMES = ['الباشا','زيزو','فلفل','الأسطى','شيخ الحارة','عم شكشك','حمدي','الزعيم'];
 export const usePlayersStore = create<PlayersState>((set) => ({
   players: [],
 
@@ -56,6 +58,20 @@ export const usePlayersStore = create<PlayersState>((set) => ({
   setHost: (id) =>
     set((state) => ({
       players: state.players.map((p) => ({ ...p, isHost: p.id === id })),
+    })),
+
+  toggleBot: (id) =>
+    set((state) => ({
+      players: state.players.map((p, idx) => {
+        if (p.id !== id) return p;
+        if (p.isBot) return { ...p, isBot: false, name: '' };
+        const usedV = state.players.filter((x) => x.id !== id).map((x) => x.vehicle);
+        const allV  = ['🛺','🏍️','🚕','🚐','🚌','🚚'];
+        const v     = allV.find((v) => !usedV.includes(v)) ?? '🏍️';
+        const nBots = state.players.filter((x) => x.isBot).length;
+        return { ...p, isBot: true, vehicle: v,
+          name: BOT_NAMES[nBots % BOT_NAMES.length] };
+      }),
     })),
 
   resetPlayers: () => set(() => ({ players: [] })),

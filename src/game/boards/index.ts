@@ -3,29 +3,25 @@ import type { BoardSize, BoardTile, City, Project, TileDef } from '../types';
 import { regionTier } from '../data/regions';
 import { fastBoard } from './fast';
 import { regularBoard } from './regular';
-import { fullBoard } from './full';
 
 /** Tile counts per board size. */
 export const BOARD_SIZES: Record<BoardSize, number> = {
   fast: 16,
   regular: 24,
-  full: 40,
 };
 
 /**
  * Ramses (start tile) salary per board size, paid when a player passes OR
- * lands on Ramses. FAST pays nothing; REGULAR and FULL pay 1500.
+ * lands on Ramses. FAST pays nothing; REGULAR and FULL pay 800.
  */
 export const RAMSES_SALARY: Record<BoardSize, number> = {
   fast: 0,
-  regular: 1500,
-  full: 1500,
+  regular: 800,
 };
 
 const RAW_BOARDS: Record<BoardSize, TileDef[]> = {
   fast: fastBoard,
   regular: regularBoard,
-  full: fullBoard,
 };
 
 /** Default board size for a given lobby game mode. */
@@ -34,7 +30,7 @@ export function boardSizeForMode(mode: GameMode): BoardSize {
     case 'quick':
       return 'fast';
     case 'custom':
-      return 'full';
+      return 'regular'; // full mode removed
     case 'classic':
     default:
       return 'regular';
@@ -103,4 +99,4 @@ export function buildProjects(board: BoardTile[]): Record<string, Project> {
   return projects;
 }
 
-export { fastBoard, regularBoard, fullBoard };
+export { fastBoard, regularBoard };
