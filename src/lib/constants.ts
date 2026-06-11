@@ -9,6 +9,7 @@ export const ROUTES = {
   board: '/game-board',
   winner: '/winner',
   auth:   '/auth',
+  admin:  '/admin',
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

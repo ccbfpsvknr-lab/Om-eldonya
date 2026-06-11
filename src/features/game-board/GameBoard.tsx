@@ -298,7 +298,28 @@ export function GameBoard() {
       <BankruptcyModal playerId={playerId} onClose={() => close(bid)} />,
       { title: 'مفيش فلوس! 😬', size: 'md', dismissable: false, hideClose: true }
     );
-  }, [open, close, bankruptPlayer, showToast, endTurn]);
+    // Auto-handle for bots: take salfa → sell cities → bankrupt
+    if (p.isBot) {
+      setTimeout(() => {
+        const g2 = useMatchStore.getState().game;
+        const bp = g2?.players.find((pl) => pl.id === playerId);
+        if (!bp || bp.cash >= 0) return; // already resolved
+        if (bp.cash + SALFA_AMOUNT >= 0 && (bp.solfaCount ?? 0) < 1) {
+          takeSalfa(playerId); return;
+        }
+        const owned = g2 ? Object.values(g2.cities)
+          .filter((c) => c.ownerId === playerId)
+          .sort((a, b) => a.price - b.price) : [];
+        for (const city of owned) {
+          sellCity(city.id);
+          const bp2 = useMatchStore.getState().game?.players.find((pl) => pl.id === playerId);
+          if (bp2 && bp2.cash >= 0) return;
+        }
+        bankruptPlayer(playerId);
+        setTimeout(() => endTurn(), 500);
+      }, 600);
+    }
+  }, [open, close, bankruptPlayer, showToast, endTurn, takeSalfa, sellCity]);
 
   // ── Landing ───────────────────────────────────────────────────────────────
 
@@ -439,7 +460,7 @@ export function GameBoard() {
           movePlayer(rawSteps);
           const after = useMatchStore.getState().game?.players[g2.currentPlayerIndex];
           const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
-          animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
+          if (!moveRef.current) animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
         } else if (card.type === 'police') {
           const g3   = useMatchStore.getState().game;
           const jIdx = g3?.board.findIndex((t) => t.type === 'jail') ?? 7;
@@ -593,6 +614,8 @@ export function GameBoard() {
   // ── Movement animation ────────────────────────────────────────────────────
   const animateAndMove = useCallback((from: number, steps: number, boardLen: number, salary: number, onDone?: () => void) => {
     if (steps === 0) { if (onDone) { onDone(); } else { resolveLanding(); } return; }
+    // Clear any in-flight animation to prevent double-movement
+    if (moveRef.current) { clearInterval(moveRef.current); moveRef.current = null; }
     const dir = steps > 0 ? 1 : -1;
     const absSteps = Math.abs(steps);
     setIsMoving(true);
@@ -1235,6 +1258,7 @@ export function GameBoard() {
                           borderRadius: '5px', padding: isFastBoard?'4px 5px':'2px 3px',
                           background: p.id===cp.id ? 'rgba(224,180,60,0.15)' : 'rgba(255,255,255,0.03)',
                           border: p.id===cp.id ? '1px solid rgba(224,180,60,0.25)' : '1px solid transparent',
+                          borderRight: `3px solid ${p.color ?? '#888'}`,
                           opacity: p.isActive ? 1 : 0.4 }}>
                           <span style={{ fontSize: (isFastBoard||isClassicRect)?'15px':'11px', lineHeight: 1, flexShrink: 0 }}>{p.vehicle}</span>
                           <span style={{ flex: 1, fontSize: isFastBoard?'11px':'7px', color: p.id===cp.id?'#F4CE5E':'#EADBB7',

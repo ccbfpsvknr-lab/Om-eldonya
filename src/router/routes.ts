@@ -57,6 +57,13 @@ export const appRoutes: AppRoute[] = [
     ),
   },
   {
+    path: ROUTES.admin,
+    label: 'Admin',
+    Component: lazy(() =>
+      import('@/features/admin/AdminScreen').then((m) => ({ default: m.AdminScreen })),
+    ),
+  },
+  {
     path: ROUTES.auth,
     label: 'الدخول',
     Component: lazy(() =>

@@ -16,6 +16,8 @@ interface AuthState {
   resetPassword:   (email: string)                                       => Promise<string | null>;
   updateNickname:  (nickname: string)                                    => Promise<string | null>;
   refreshProfile:  ()                                                    => Promise<void>;
+  getAllUsers:      ()                                                    => Promise<Profile[]>;
+  callAdminOp:     (action: string, payload: Record<string, unknown>)   => Promise<{ error?: string } & Record<string, unknown>>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -117,6 +119,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ profile: { ...profile, nickname, coins: profile.coins - 50 } });
     return null;
+  },
+
+  getAllUsers: async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true });
+    return (data ?? []) as Profile[];
+  },
+
+  callAdminOp: async (action, payload) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'Not logged in' };
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-ops`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    return await res.json();
   },
 
   refreshProfile: async () => {
