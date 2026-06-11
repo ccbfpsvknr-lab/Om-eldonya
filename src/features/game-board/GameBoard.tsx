@@ -98,12 +98,15 @@ export function GameBoard() {
   // ── 20-min late-game tracker ─────────────────────────────────────────────
   const [lateGame, setLateGame] = useState(false);
   useEffect(() => {
-    if (!game?.startedAt || game.mode === 'quick' || lateGame) return;
-    const remaining = 20 * 60 * 1000 - (Date.now() - game.startedAt);
+    // Read game from store directly to avoid TDZ (game const is declared later in component)
+    const g = useMatchStore.getState().game;
+    if (!g?.startedAt || g.mode === 'quick' || lateGame) return;
+    const remaining = 20 * 60 * 1000 - (Date.now() - g.startedAt);
     if (remaining <= 0) { setLateGame(true); return; }
     const t = setTimeout(() => setLateGame(true), remaining);
     return () => clearTimeout(t);
-  }, [game?.startedAt, game?.mode, lateGame]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lateGame]);
 
   // ── Portrait detection ────────────────────────────────────────────────────
   const [isPortrait, setIsPortrait] = useState(
