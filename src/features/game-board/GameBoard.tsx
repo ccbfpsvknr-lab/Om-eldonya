@@ -393,8 +393,17 @@ export function GameBoard() {
         animateAndMove(fromPos, steps, bLen, 0, () => {}); // animate to jail, no salary
       };
       if (isCurrentBot) {
-        // Bot: teleport to jail (no nested animation — avoids isMoving conflict)
+        // Defer jail animation 50ms so outer setIsMoving(false) runs first,
+        // then start fresh: setIsMoving(true) → animate → setIsMoving(false)
+        const policePos = player.position;
         goToJail(pid2);
+        setTimeout(() => {
+          const gb = useMatchStore.getState().game;
+          const jIdx3 = gb?.board.findIndex((t) => t.type === 'jail') ?? 7;
+          const bLen3 = gb?.board.length ?? 24;
+          const steps3 = ((jIdx3 - policePos) % bLen3 + bLen3) % bLen3 || bLen3;
+          animateAndMove(policePos, steps3, bLen3, 0, () => {});
+        }, 60);
       } else {
         pid = open(
           <div className="text-center space-y-5">
@@ -411,9 +420,40 @@ export function GameBoard() {
       const result = drawChance();
       if (!result) return;
       const card = getCard(result.cardId);
-      // ALL players (including bots) see the chance card modal.
-      // Bots auto-close after 2.2s so watchers can see what happened.
+      // ALL players see the card. Bots auto-trigger full effect after 2s.
       let cid = '';
+      let doChanceEffect = () => {};
+      doChanceEffect = () => {
+        close(cid);
+        if (card.skipNextTurn) { markSkipTurn(player.id); return; }
+        if (card.type === 'move') {
+          const g2 = useMatchStore.getState().game;
+          const cur = g2?.players[g2.currentPlayerIndex];
+          if (!cur || !g2) return;
+          const boardLen = g2.board.length;
+          const rawSteps = card.toTile !== undefined
+            ? ((card.toTile - cur.position + boardLen) % boardLen)
+            : (card.spaces ?? 0);
+          if (rawSteps === 0) return;
+          const cashBefore = cur.cash;
+          movePlayer(rawSteps);
+          const after = useMatchStore.getState().game?.players[g2.currentPlayerIndex];
+          const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
+          animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
+        } else if (card.type === 'police') {
+          const g3   = useMatchStore.getState().game;
+          const jIdx = g3?.board.findIndex((t) => t.type === 'jail') ?? 7;
+          const bLen = g3?.board.length ?? 24;
+          const from = player.position;
+          goToJail(player.id);
+          const steps2 = ((jIdx - from) % bLen + bLen) % bLen || bLen;
+          animateAndMove(from, steps2, bLen, 0, () => {});
+        } else if (card.type === 'bonus' && card.rollAgain) {
+          setRollAgainPending(true);
+        } else if ((card.type === 'money' || card.type === 'govt') && card.amount && card.amount < 0) {
+          checkInsolvency(player.id);
+        }
+      };
       cid = open(
         <div className="space-y-4 text-center">
           <div className="text-5xl">🎴</div>
@@ -425,46 +465,13 @@ export function GameBoard() {
               {card.amount > 0 ? '+' : ''}{cashEmoji(Math.abs(card.amount))}{card.amount.toLocaleString('en-US')}
             </p>
           )}
-          <Button block size="lg" onClick={() => {
-            close(cid);
-            if (card.skipNextTurn) {
-              markSkipTurn(player.id); return;
-            }
-            if (card.type === 'move') {
-              const g2 = useMatchStore.getState().game;
-              const cur = g2?.players[g2.currentPlayerIndex];
-              if (!cur || !g2) return;
-              const boardLen = g2.board.length;
-              const rawSteps = card.toTile !== undefined
-                ? ((card.toTile - cur.position + boardLen) % boardLen)  // always forward to target
-                : (card.spaces ?? 0); // can be negative (backwards)
-              if (rawSteps === 0) return;
-              const cashBefore = cur.cash;
-              movePlayer(rawSteps);
-              const after = useMatchStore.getState().game?.players[g2.currentPlayerIndex];
-              const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
-              animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
-            } else if (card.type === 'police') {
-              const g3    = useMatchStore.getState().game;
-              const jIdx  = g3?.board.findIndex((t) => t.type === 'jail') ?? 7;
-              const bLen2 = g3?.board.length ?? 24;
-              const from2 = player.position;
-              goToJail(player.id);
-              const steps2 = ((jIdx - from2) % bLen2 + bLen2) % bLen2 || bLen2;
-              animateAndMove(from2, steps2, bLen2, 0, () => {}); // animate to jail, no salary
-            } else if (card.type === 'bonus' && card.rollAgain) {
-              setRollAgainPending(true);
-            } else if ((card.type === 'money' || card.type === 'govt') && card.amount && card.amount < 0) {
-              checkInsolvency(player.id);
-            }
-          }}>
+          <Button block size="lg" onClick={() => doChanceEffect()}>
             {card.type === 'bonus' && card.rollAgain ? 'ارمي تاني ⚄' : 'خلاص'}
           </Button>
         </div>,
         { size: 'sm', dismissable: false, hideClose: true }
       );
-
-
+      if (isCurrentBot) setTimeout(() => doChanceEffect(), 2000);
     } else if (tile.type === 'news') {
       const NEWS_POOL = [
         { icon:'🛢️', title:'أسعار البنزين ولعت!',    sub:'كل واحد فيكم هيدفع ١٥٠ جنيه… يعني هتمشوا على رجليكم من دلوقتي 😭',  effect:'allPay',            amount:150 },
@@ -715,13 +722,12 @@ export function GameBoard() {
   useEffect(() => {
     if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
 
-    if (phase === 'rolling') {
+    if (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) {
       const myPlayerId = cp.id;
       const t = setTimeout(() => {
         const g2 = useMatchStore.getState().game;
-        // Only roll if it's still THIS bot's turn
         if (g2?.players[g2.currentPlayerIndex]?.id === myPlayerId) handleRoll();
-      }, 700 + Math.random() * 500);
+      }, 800 + Math.random() * 500);
       return () => clearTimeout(t);
     }
 
@@ -993,8 +999,8 @@ export function GameBoard() {
                       </div>
                       {/* Price + Live Rent */}
                       {(() => {
-                        // For unowned: show baseRent (what you'd pay). For owned: show live rent (with upgrades/region bonus).
-                        const liveRent = city ? (isOwned ? getCityRent(game, city) : (city.baseRent ?? 0)) : 0;
+                        // For unowned: show baseRent*2 (actual rent = baseRent × rentMult×2). For owned: show live rent.
+                        const liveRent = city ? (isOwned ? getCityRent(game, city) : (city.baseRent ?? 0) * 2) : 0;
                         const fs  = (isFastBoard || isClassicRect) ? '9px' : '7px';
                         const fsS = (isFastBoard || isClassicRect) ? '8px' : '6px';
                         return (
@@ -1296,8 +1302,8 @@ function BuyCityModal({ city, canAfford, onBuy, onPass }: {
       <div style={{ display: 'flex', borderBottom: `1px solid rgba(56,74,110,0.3)` }}>
         {[
           { label: 'التمن', value: city.price.toLocaleString('en-US'), color: regionColor, icon: cashEmoji(city.price) },
-          { label: 'الإيجار', value: city.baseRent.toLocaleString('en-US'), color: '#C75B39', icon: '🏠' },
-          { label: 'لو كملت', value: (city.baseRent * 2).toLocaleString('en-US'), color: '#2A9D8F', icon: '🏠🏠' },
+          { label: 'الإيجار', value: (city.baseRent * 2).toLocaleString('en-US'), color: '#C75B39', icon: '🏠' },
+          { label: 'لو كملت', value: (city.baseRent * 4).toLocaleString('en-US'), color: '#2A9D8F', icon: '🏠🏠' },
         ].map(({ label, value, color, icon }) => (
           <div key={label} style={{ flex: 1, padding: '12px 8px', textAlign: 'center',
             borderLeft: '1px solid rgba(56,74,110,0.2)' }}>

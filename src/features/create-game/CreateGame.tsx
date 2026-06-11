@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store';
-import { ROUTES, PLAYER_LIMITS } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
 import type { GameMode } from '@/types';
 
 /* ─── Mode definitions ──────────────────────────────────────────────────────── */
@@ -152,44 +152,7 @@ export function CreateGame() {
           );
         })}
 
-        {/* ── Player count ── */}
-        <div className="rounded-2xl border border-[rgba(56,74,110,0.5)] bg-[rgba(14,23,38,0.85)] overflow-hidden mt-1">
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(56,74,110,0.3)]">
-            <span className="text-base">👥</span>
-            <p className="flex-1 text-sm font-bold text-[#EADBB7]"
-              style={{ fontFamily: "'Cairo', sans-serif" }}>
-              عدد اللاعبين
-            </p>
-            <span className="text-xl font-extrabold text-[#E0B43C]"
-              style={{ fontFamily: "'Cairo', sans-serif" }}>
-              {config.maxPlayers}
-            </span>
-          </div>
-          <div className="flex items-center justify-between px-3 py-3 gap-2">
-            {Array.from({ length: modeMax - PLAYER_LIMITS.min + 1 }, (_, i) => {
-              const n = i + PLAYER_LIMITS.min;
-              const selected = config.maxPlayers === n;
-              return (
-                <button key={n}
-                  onClick={() => updateConfig({ maxPlayers: n })}
-                  className="flex-1 flex flex-col items-center gap-1 rounded-xl py-2 transition-all"
-                  style={{
-                    background: selected ? 'rgba(224,180,60,0.2)' : 'rgba(56,74,110,0.2)',
-                    border: `1.5px solid ${selected ? 'rgba(224,180,60,0.6)' : 'rgba(56,74,110,0.4)'}`,
-                    boxShadow: selected ? '0 0 12px rgba(224,180,60,0.25)' : 'none',
-                  }}>
-                  <span className="text-base leading-none">
-                    {['🛺','🏍️','🚕','🚐','🚌','🚚'][i]}
-                  </span>
-                  <span className="text-[10px] font-bold"
-                    style={{ color: selected ? '#E0B43C' : '#9AA6BC' }}>
-                    {n}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+
       </div>
 
       {/* ── Footer button ── */}
