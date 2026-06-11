@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
+import { SettingsModal } from '@/features/settings/SettingsModal';
 import { useModal } from '@/hooks/useModal';
 import { useGameStore } from '@/store';
 import { ROUTES } from '@/lib/constants';
@@ -41,7 +43,16 @@ function RulesContent() {
 
 /* ─── Main component ───────────────────────────────────────────────────────── */
 export function MainMenu() {
-  const navigate   = useNavigate();
+  const navigate    = useNavigate();
+  const { user, profile } = useAuthStore();
+
+  const openSettings = () => {
+    if (!user) { navigate(ROUTES.auth); return; }
+    let sid = '';
+    sid = open(<SettingsModal onClose={() => close(sid)} />, {
+      title: 'الإعدادات ⚙️', size: 'sm',
+    });
+  };
   const { open, close } = useModal();
   const createGame = useGameStore((s) => s.createGame);
 
