@@ -11,7 +11,7 @@ interface AuthState {
 
   initialize:      ()                                                    => Promise<void>;
   signUp:          (email: string, password: string, username: string, nickname: string) => Promise<string | null>;
-  signIn:          (email: string, password: string)                    => Promise<string | null>;
+  signIn:          (emailOrUsername: string, password: string)          => Promise<string | null>;
   signOut:         ()                                                    => Promise<void>;
   resetPassword:   (email: string)                                       => Promise<string | null>;
   updateNickname:  (nickname: string)                                    => Promise<string | null>;
@@ -69,9 +69,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signIn: async (email, password) => {
+  signIn: async (emailOrUsername, password) => {
     set({ loading: true });
     try {
+      let email = emailOrUsername.trim().toLowerCase();
+      // If not an email, look up by username
+      if (!email.includes('@')) {
+        const { data, error: lookupErr } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', email)
+          .single();
+        if (lookupErr || !data?.email) return 'مش لاقيين اسم المستخدم ده';
+        email = data.email;
+      }
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return translateError(error.message);
       return null;
@@ -119,11 +130,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 // Translate common Supabase errors to Arabic
 function translateError(msg: string): string {
-  if (msg.includes('Invalid login'))   return 'الإيميل أو الباسورد غلط';
-  if (msg.includes('Email not confirmed')) return 'لازم تأكد الإيميل الأول';
-  if (msg.includes('already registered')) return 'الإيميل ده متسجل بالفعل';
-  if (msg.includes('Password should'))  return 'الباسورد لازم يكون ٦ حروف على الأقل';
-  if (msg.includes('rate limit'))       return 'حاول تاني بعد شوية';
-  if (msg.includes('network'))          return 'فيه مشكلة في الإنترنت';
+  if (msg.includes('Invalid login'))        return 'اسم المستخدم أو الباسورد غلط';
+  if (msg.includes('Email not confirmed'))  return 'لازم تأكد الإيميل الأول، افتح الإيميل واضغط اللينك';
+  if (msg.includes('already registered') ||
+      msg.includes('already been registered')) return 'الإيميل ده متسجل بالفعل، حاول تدخل';
+  if (msg.includes('Password should'))      return 'الباسورد لازم يكون ٦ حروف على الأقل';
+  if (msg.includes('rate limit'))           return 'حاول تاني بعد شوية';
+  if (msg.includes('network'))              return 'فيه مشكلة في الإنترنت';
+  if (msg.includes('Database error'))       return 'خطأ في الحساب — ممكن اسم المستخدم ده موجود بالفعل';
+  if (msg.includes('duplicate') ||
+      msg.includes('unique'))               return 'اسم المستخدم ده موجود بالفعل، جرب تاني';
+  if (msg.includes('User already registered')) return 'الإيميل ده متسجل بالفعل';
   return 'حصل خطأ، حاول تاني';
 }

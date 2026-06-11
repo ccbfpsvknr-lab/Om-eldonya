@@ -151,7 +151,7 @@ export function AuthScreen() {
 
         {/* ── Login form ── */}
         {tab === 'login' && (<>
-          {field('الإيميل', email, setEmail, { type: 'email', placeholder: 'example@gmail.com' })}
+          {field('اسم المستخدم أو الإيميل', email, setEmail, { placeholder: 'ahmed123 أو email@gmail.com' })}
           {field('الباسورد', password, setPass, { type: 'password', placeholder: '••••••••' })}
           {btn('ادخل', handleLogin)}
           <button onClick={() => { setTab('reset'); clearMessages(); }}

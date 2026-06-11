@@ -393,8 +393,8 @@ export function GameBoard() {
         animateAndMove(fromPos, steps, bLen, 0, () => {}); // animate to jail, no salary
       };
       if (isCurrentBot) {
-        // Bot: go to jail silently + animate
-        onJailConfirm();
+        // Bot: teleport to jail (no nested animation — avoids isMoving conflict)
+        goToJail(pid2);
       } else {
         pid = open(
           <div className="text-center space-y-5">
@@ -613,14 +613,7 @@ export function GameBoard() {
               <p className="text-xl font-extrabold text-gold mt-1">+{salary.toLocaleString('en-US')} جنيه</p>
             </div>
           );
-          if (onDone) {
-            onDone();
-            setIsMoving(false);
-          } else {
-            resolveLanding();
-            // Only stop moving if resolveLanding didn't start a secondary animation (e.g. jail)
-            if (!moveRef.current) setIsMoving(false);
-          }
+          if (onDone) { onDone(); setIsMoving(false); } else { resolveLanding(); setIsMoving(false); }
         }, 150);
       }
     }, 350);
