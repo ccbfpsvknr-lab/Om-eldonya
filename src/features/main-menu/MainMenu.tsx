@@ -322,12 +322,6 @@ export function MainMenu() {
               <span className="text-xl">🎲</span>
               <span>يلا بينا</span>
             </span>
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: 'linear-gradient(135deg, #F4CE5E 0%, #E0B43C 50%, #F4CE5E 100%)' }}/>
-            <span className="relative flex items-center justify-center gap-2 text-[#0E1726]">
-              <span className="text-xl">🎲</span>
-              <span>يلا بينا</span>
-            </span>
           </button>
 
           {/* الأصدقاء — DISABLED */}

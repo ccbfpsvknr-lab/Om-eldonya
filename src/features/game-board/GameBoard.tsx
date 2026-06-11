@@ -225,49 +225,6 @@ export function GameBoard() {
   }, [game?.currentPlayerIndex, game?.phase]);
 
 
-  // ── Bot automation ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
-
-    if (phase === 'rolling') {
-      // Bot "thinks" then rolls
-      const t = setTimeout(() => {
-        const g2 = useMatchStore.getState().game;
-        if (g2?.players[g2.currentPlayerIndex]?.isBot) handleRoll();
-      }, 700 + Math.random() * 500);
-      return () => clearTimeout(t);
-    }
-
-    if (phase === 'turn-end' && openModalCount === 0 && !rollAgainPending) {
-      // Bot considers upgrading before ending turn
-      const t = setTimeout(() => {
-        const g2 = useMatchStore.getState().game;
-        const cur = g2?.players[g2?.currentPlayerIndex ?? -1];
-        if (!g2 || !cur?.isBot) return;
-        // Upgrade: own full region, can afford, hasn't upgraded yet
-        if (!g2.hasUpgradedThisTurn) {
-          const cities = Object.values(g2.cities);
-          for (const city of cities) {
-            if (city.ownerId !== cur.id) continue;
-            if (canUpgrade(g2, city, cur.id)) {
-              const cost = getUpgradeCost(city);
-              if (cur.cash > cost * 1.6 && Math.random() < 0.45) {
-                upgradeCity(city.id);
-                break;
-              }
-            }
-          }
-        }
-        setTimeout(() => {
-          const g3 = useMatchStore.getState().game;
-          if (g3?.players[g3.currentPlayerIndex]?.isBot) handleEndTurn();
-        }, 400);
-      }, 600);
-      return () => clearTimeout(t);
-    }
-  }, [phase, cp?.isBot, isMoving, diceRolling, openModalCount, rollAgainPending,
-      handleRoll, handleEndTurn, upgradeCity, game]);
-
   const handleQuit = async () => {
     const ok = await confirm({ title: 'إنهاء اللعبة', message: 'لو خرجت دلوقتي، اللعبة راحت مع الريح. متأكد؟', confirmLabel: 'اخرج', danger: true });
     if (ok) { resetMatch(); resetGame(); resetPlayers(); navigate(ROUTES.home); }
@@ -782,6 +739,51 @@ export function GameBoard() {
     setLastRoll(null); setRollAgainPending(false);
     endTurn();
   };
+
+  // ── Bot automation ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
+
+    if (phase === 'rolling') {
+      // Bot "thinks" then rolls
+      const t = setTimeout(() => {
+        const g2 = useMatchStore.getState().game;
+        if (g2?.players[g2.currentPlayerIndex]?.isBot) handleRoll();
+      }, 700 + Math.random() * 500);
+      return () => clearTimeout(t);
+    }
+
+    if (phase === 'turn-end' && openModalCount === 0 && !rollAgainPending) {
+      // Bot considers upgrading before ending turn
+      const t = setTimeout(() => {
+        const g2 = useMatchStore.getState().game;
+        const cur = g2?.players[g2?.currentPlayerIndex ?? -1];
+        if (!g2 || !cur?.isBot) return;
+        // Upgrade: own full region, can afford, hasn't upgraded yet
+        if (!g2.hasUpgradedThisTurn) {
+          const cities = Object.values(g2.cities);
+          for (const city of cities) {
+            if (city.ownerId !== cur.id) continue;
+            if (canUpgrade(g2, city, cur.id)) {
+              const cost = getUpgradeCost(city);
+              if (cur.cash > cost * 1.6 && Math.random() < 0.45) {
+                upgradeCity(city.id);
+                break;
+              }
+            }
+          }
+        }
+        setTimeout(() => {
+          const g3 = useMatchStore.getState().game;
+          if (g3?.players[g3.currentPlayerIndex]?.isBot) handleEndTurn();
+        }, 400);
+      }, 600);
+      return () => clearTimeout(t);
+    }
+  }, [phase, cp?.isBot, isMoving, diceRolling, openModalCount, rollAgainPending,
+      handleRoll, handleEndTurn, upgradeCity, game]);
+
+
 
   // ── Board dimensions ──────────────────────────────────────────────────────
 
