@@ -92,7 +92,9 @@ const cashEmoji = (n: number): string =>
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function GameBoard() {
-  const navigate   = useNavigate();
+  const navigate    = useNavigate();
+  const { room, myUserId, pushGameState, subscribe, unsubscribe, markDisconnected, markReconnected } = useRoomStore();
+  const isOnlineGame = !!room && room.status === 'playing';
   const { confirm, open, close } = useModal();
 
   // ── 20-min late-game tracker ─────────────────────────────────────────────
@@ -108,15 +110,55 @@ export function GameBoard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lateGame]);
 
+  // ── Online room subscription ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOnlineGame) return;
+    subscribe(
+      (event, payload) => {
+        // Animation hints (future: dice sync, movement preview)
+        console.log('[room event]', event, payload);
+      },
+      (incomingGame) => {
+        // Another player pushed state — update local store
+        useMatchStore.setState((s) => ({ game: incomingGame }));
+      },
+      (players) => {
+        // Player online status changed
+        players.forEach((p) => {
+          if (!p.isOnline) {
+            // Mark their game player as bot after 10s (handled in useRoomStore)
+            markDisconnected(p.userId);
+          } else {
+            markReconnected(p.userId);
+          }
+        });
+      }
+    );
+    return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineGame]);
+
   // ── Portrait detection ────────────────────────────────────────────────────
   const [isPortrait, setIsPortrait] = useState(
     () => window.innerHeight > window.innerWidth
   );
+  const [deviceScale, setDeviceScale] = useState(1);
+
   useEffect(() => {
-    const onResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
-    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); };
+    const update = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setIsPortrait(h > w);
+      // Scale tile content for small screens (phones in landscape)
+      const landH = Math.min(w, h); // height when landscape
+      // Below 420px height (small phones) → scale tile content down
+      const s = Math.min(landH / 420, 1);
+      setDeviceScale(s);
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('orientationchange', update); };
   }, []);
 
 
@@ -858,7 +900,7 @@ export function GameBoard() {
   return (
     <div dir="rtl" className="flex h-[100dvh] w-full items-center justify-center overflow-hidden"
       style={{ background: '#5c3a1e' }}>
-      <div style={{ width: boardWidth, height: boardHeight, padding: isFastBoard ? '0' : '3px' }}>
+      <div style={{ width: boardWidth, height: boardHeight, padding: isFastBoard ? '0' : '3px', zoom: deviceScale }}>
         <div className="relative w-full h-full overflow-hidden"
           style={{
             borderRadius: isFastBoard ? '12px' : '12px',
@@ -1028,8 +1070,10 @@ export function GameBoard() {
                       {(() => {
                         // For unowned: show baseRent*2 (actual rent = baseRent × rentMult×2). For owned: show live rent.
                         const liveRent = city ? (isOwned ? getCityRent(game, city) : (city.baseRent ?? 0) * 2) : 0;
-                        const fs  = (isFastBoard || isClassicRect) ? '9px' : '7px';
-                        const fsS = (isFastBoard || isClassicRect) ? '8px' : '6px';
+                        const fsBase = (isFastBoard || isClassicRect) ? 9 : 7;
+                        const fsSBase = (isFastBoard || isClassicRect) ? 8 : 6;
+                        const fs  = `${Math.round(fsBase  * deviceScale)}px`;
+                        const fsS = `${Math.round(fsSBase * deviceScale)}px`;
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
                             {!isOwned ? (
@@ -1673,7 +1717,7 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
       {/* ── Portrait overlay — ask user to rotate ── */}
       {isPortrait && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
+          position: 'fixed', inset: 0, zIndex: 99999,
           background: '#0E1726',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',

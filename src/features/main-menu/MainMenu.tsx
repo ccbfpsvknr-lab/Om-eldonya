@@ -75,6 +75,8 @@ export function MainMenu() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showWelcome]);
 
+  const openRooms = () => { if (!user) { navigate(ROUTES.auth); return; } navigate(ROUTES.rooms); };
+
   const openSettings = () => {
     if (!user) { navigate(ROUTES.auth); return; }
     let sid = '';
@@ -353,9 +355,9 @@ export function MainMenu() {
             </span>
           </button>
 
-          {/* الأصدقاء — DISABLED */}
-          <button disabled
-            className="relative w-full overflow-hidden rounded-2xl border border-[rgba(56,74,110,0.5)] py-3.5 opacity-50 cursor-not-allowed"
+          {/* الأصدقاء — Online Rooms */}
+          <button onClick={openRooms}
+            className="relative w-full overflow-hidden rounded-2xl border border-[rgba(56,74,110,0.5)] py-3.5 cursor-pointer hover:border-[rgba(224,180,60,0.4)] transition-colors"
             style={{
               background: 'rgba(14,23,38,0.7)',
               fontFamily: "'Cairo', sans-serif",
@@ -366,7 +368,7 @@ export function MainMenu() {
             <span className="flex items-center justify-center gap-2 text-[#EADBB7]">
               <span className="text-lg">👥</span>
               <span>الأصدقاء</span>
-              <span className="ms-1 rounded-full bg-[rgba(56,74,110,0.8)] px-2 py-0.5 text-[9px] text-[#9AA6BC]">قريباً</span>
+              <span className="ms-1 rounded-full bg-[rgba(56,74,110,0.8)] px-2 py-0.5 text-[9px] text-[#9AA6BC]">ً</span>
             </span>
           </button>
 

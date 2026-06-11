@@ -57,6 +57,13 @@ export const appRoutes: AppRoute[] = [
     ),
   },
   {
+    path: ROUTES.rooms,
+    label: 'الأصدقاء',
+    Component: lazy(() =>
+      import('@/features/rooms/RoomScreen').then((m) => ({ default: m.RoomScreen })),
+    ),
+  },
+  {
     path: ROUTES.admin,
     label: 'Admin',
     Component: lazy(() =>
