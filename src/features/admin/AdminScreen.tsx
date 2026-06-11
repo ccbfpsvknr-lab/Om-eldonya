@@ -44,7 +44,7 @@ const S = {
 
 export function AdminScreen() {
   const navigate   = useNavigate();
-  const { profile, getAllUsers, callAdminOp } = useAuthStore();
+  const { profile, getAllUsers, callAdminOp, updateUserCoins } = useAuthStore();
   const [view, setView]       = useState<View>('list');
   const [users, setUsers]     = useState<(Profile & { auth_id?: string })[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,8 @@ export function AdminScreen() {
   // Reset password inline
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [newPass, setNewPass]         = useState('');
+  const [coinTarget, setCoinTarget]   = useState<string | null>(null);
+  const [coinAmount, setCoinAmount]   = useState('');
 
   // Guard: redirect non-admins
   useEffect(() => {
@@ -75,6 +77,18 @@ export function AdminScreen() {
   const showMsg = (text: string, err = false) => {
     setMsg(text); setIsErr(err);
     setTimeout(() => setMsg(''), 3500);
+  };
+
+  const handleAddCoins = async (userId: string, currentCoins: number) => {
+    const amount = parseInt(coinAmount);
+    if (isNaN(amount) || amount === 0) { showMsg('ادخل رقم صحيح', true); return; }
+    setLoading(true);
+    const err = await updateUserCoins(userId, currentCoins + amount);
+    setLoading(false);
+    if (err) { showMsg(err, true); return; }
+    showMsg(`تم ${amount > 0 ? 'إضافة' : 'خصم'} ${Math.abs(amount)} عملة ✓`);
+    setCoinTarget(null); setCoinAmount('');
+    loadUsers();
   };
 
   const handleCreate = async () => {
@@ -175,8 +189,11 @@ export function AdminScreen() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => { setCoinTarget(u.id); setCoinAmount(''); }} style={S.btnGray}>
+                    🪙
+                  </button>
                   <button onClick={() => { setResetTarget(u.id); setNewPass(''); }} style={S.btnGray}>
-                    🔑 باسورد
+                    🔑
                   </button>
                   {!u.is_admin && (
                     <button onClick={() => handleDelete(u.id, u.username)} style={S.btnRed}>
@@ -185,6 +202,22 @@ export function AdminScreen() {
                   )}
                 </div>
               </div>
+
+              {/* Inline coins management */}
+              {coinTarget === u.id && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input type="number"
+                    value={coinAmount}
+                    onChange={(e) => setCoinAmount(e.target.value)}
+                    placeholder="مثلاً 50 أو -10"
+                    style={{ ...S.input, flex: 1 }}
+                  />
+                  <button onClick={() => handleAddCoins(u.id, u.coins ?? 0)} disabled={loading} style={S.btnGold}>
+                    تأكيد
+                  </button>
+                  <button onClick={() => setCoinTarget(null)} style={S.btnGray}>إلغاء</button>
+                </div>
+              )}
 
               {/* Inline password reset */}
               {resetTarget === u.id && (

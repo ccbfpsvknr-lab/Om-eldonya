@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { SettingsModal } from '@/features/settings/SettingsModal';
 import { useModal } from '@/hooks/useModal';
@@ -44,7 +45,35 @@ function RulesContent() {
 /* ─── Main component ───────────────────────────────────────────────────────── */
 export function MainMenu() {
   const navigate    = useNavigate();
-  const { user, profile } = useAuthStore();
+  const { user, profile, showWelcome, setShowWelcome } = useAuthStore();
+
+  // Welcome gift popup
+  useEffect(() => {
+    if (showWelcome) {
+      const wid = open(
+        <div style={{ textAlign: 'center', padding: '8px 0' }} dir="rtl">
+          <div style={{ fontSize: '64px', marginBottom: '8px' }}>🎁</div>
+          <h2 style={{ fontFamily: "'Cairo'", fontWeight: 900, fontSize: '1.3rem', color: '#F4CE5E', margin: 0 }}>
+            أهلاً بيك في أم الدنيا!
+          </h2>
+          <p style={{ fontFamily: "'Cairo'", color: '#9AA6BC', fontSize: '0.9rem', margin: '8px 0' }}>
+            هدية ترحيبية منّا ليك
+          </p>
+          <p style={{ fontFamily: "'Cairo'", fontWeight: 900, fontSize: '1.6rem', color: '#E0B43C', margin: '8px 0' }}>
+            +5 🪙 عملات
+          </p>
+          <button onClick={() => { close(wid); setShowWelcome(false); }}
+            style={{ marginTop: '12px', width: '100%', padding: '12px', borderRadius: '12px', border: 'none',
+              background: 'linear-gradient(135deg, #E8C040, #C49020)', color: '#0E1726',
+              fontFamily: "'Cairo'", fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>
+            تمام 🎉
+          </button>
+        </div>,
+        { title: '', size: 'sm', dismissable: false, hideClose: true }
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showWelcome]);
 
   const openSettings = () => {
     if (!user) { navigate(ROUTES.auth); return; }

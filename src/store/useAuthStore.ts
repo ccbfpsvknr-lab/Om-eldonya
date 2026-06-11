@@ -15,7 +15,10 @@ interface AuthState {
   signOut:         ()                                                    => Promise<void>;
   resetPassword:   (email: string)                                       => Promise<string | null>;
   updateNickname:  (nickname: string)                                    => Promise<string | null>;
-  refreshProfile:  ()                                                    => Promise<void>;
+  refreshProfile:    ()                                                  => Promise<void>;
+  updateUserCoins:   (userId: string, coins: number)                     => Promise<string | null>;
+  setShowWelcome:    (v: boolean)                                         => void;
+  showWelcome:       boolean;
   getAllUsers:      ()                                                    => Promise<Profile[]>;
   callAdminOp:     (action: string, payload: Record<string, unknown>)   => Promise<{ error?: string } & Record<string, unknown>>;
 }
@@ -26,6 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session:     null,
   initialized: false,
   loading:     false,
+  showWelcome: false,
 
   initialize: async () => {
     // Check existing session (auto-login)
@@ -46,14 +50,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           username: baseUser,
           nickname: (meta.nickname as string) || baseUser,
           email:    session.user.email ?? '',
-          coins:    500,
-          is_admin: (count ?? 0) === 0,   // first user = admin
+          coins:    0,
+          is_admin: (count ?? 0) === 0,
         });
         const { data: newP } = await supabase
           .from('profiles').select('*').eq('id', session.user.id).single();
         profileData = newP;
       }
-      set({ user: session.user, session, profile: profileData ?? null });
+      // Welcome gift: if coins = 0, give 5 coins on first load
+      if (profileData && (profileData.coins ?? 0) === 0) {
+        await supabase.from('profiles').update({ coins: 5 }).eq('id', session.user.id);
+        profileData = { ...profileData, coins: 5 };
+        set({ user: session.user, session, profile: profileData, showWelcome: true });
+      } else {
+        set({ user: session.user, session, profile: profileData ?? null });
+      }
     }
     set({ initialized: true });
 
@@ -166,6 +177,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       body: JSON.stringify({ action, ...payload }),
     });
     return await res.json();
+  },
+
+  setShowWelcome: (v) => set({ showWelcome: v }),
+
+  updateUserCoins: async (userId, coins) => {
+    const { error } = await supabase
+      .from('profiles').update({ coins }).eq('id', userId);
+    if (error) return error.message;
+    return null;
   },
 
   refreshProfile: async () => {
