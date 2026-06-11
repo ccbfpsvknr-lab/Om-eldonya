@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoomStore, type RoomPlayer } from '@/store/useRoomStore';
 import { usePlayersStore, useGameStore } from '@/store';
+import { supabase } from '@/lib/supabase';
 import { VEHICLES } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ROUTES } from '@/lib/constants';
@@ -49,6 +50,31 @@ export function RoomScreen() {
 
   const userId   = profile?.id ?? '';
   const nickname = profile?.nickname ?? 'ضيف';
+
+  // ── POLL for game start (non-host) — reliable backup for broadcast race conditions ──
+  useEffect(() => {
+    if (!room || room.hostId === userId || room.status === 'playing') return;
+    const poll = setInterval(async () => {
+      const { data } = await supabase.from('rooms')
+        .select('status, game_state, mode').eq('id', room.id).single();
+      if (data?.status === 'playing' && data?.game_state?.players) {
+        clearInterval(poll);
+        const players: RoomPlayer[] = data.game_state.players;
+        const mode: 'quick' | 'classic' = data.game_state.mode ?? room.mode;
+        const ps = usePlayersStore.getState();
+        ps.resetPlayers();
+        players.forEach((p: RoomPlayer) => ps.addPlayer(p.nickname, p.vehicle));
+        const currentP = usePlayersStore.getState().players;
+        players.forEach((p: RoomPlayer, i: number) => {
+          if (p.isBot && currentP[i]) ps.toggleBot(currentP[i].id);
+        });
+        useGameStore.getState().setMode(mode);
+        navigate(ROUTES.reveal);
+      }
+    }, 1500);
+    return () => clearInterval(poll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.id, room?.hostId, room?.status]);
 
   // Subscribe to room events when room is created/joined
   useEffect(() => {
@@ -120,8 +146,10 @@ export function RoomScreen() {
       // Set game mode
       setGameMode(room.mode);
       // Update room status in DB
-      const { supabase } = await import('@/lib/supabase');
-      await supabase.from('rooms').update({ status: 'playing' }).eq('id', room.id);
+      await supabase.from('rooms').update({
+        status: 'playing',
+        game_state: { players: room.players, mode: room.mode },
+      }).eq('id', room.id);
       useRoomStore.setState((s) => ({
         room: s.room ? { ...s.room, status: 'playing' } : null,
       }));
