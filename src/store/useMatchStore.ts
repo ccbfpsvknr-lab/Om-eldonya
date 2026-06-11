@@ -462,6 +462,29 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     return { game: { ...s.game, players } };
   }),
 
+  payAmount: (amount) => {
+    const g = get().game;
+    if (!g) return 0;
+    const idx = g.currentPlayerIndex;
+    const players = g.players.map((p, i) =>
+      i === idx ? { ...p, cash: p.cash - amount } : p
+    );
+    set({ game: { ...g, players } });
+    return amount;
+  },
+
+  transferBetweenPlayers: (fromId, toId, amount) => {
+    set((s) => {
+      if (!s.game) return s;
+      const players = s.game.players.map((p) => {
+        if (p.id === fromId) return { ...p, cash: p.cash - amount };
+        if (p.id === toId)   return { ...p, cash: p.cash + amount };
+        return p;
+      });
+      return { game: { ...s.game, players } };
+    });
+  },
+
   applyNewsEvent: (effect, amount) => {
     const g = get().game;
     if (!g) return;
