@@ -85,7 +85,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       const myRoom: Room = {
         id: room.id, code: room.code, hostId: userId, mode,
         status: 'waiting', gameState: null,
-        players: [{ userId, nickname, color: '#E8C040', vehicle: '🚗', seat: 0, isOnline: true, isHost: true }],
+        players: [{ userId, nickname, color: '#E8C040', vehicle: '🚗', seat: 0, isOnline: true, isHost: true, isBot: false }],
       };
       set({ room: myRoom, myUserId: userId, loading: false });
       return null;
@@ -124,9 +124,17 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         color: colors[seat], vehicle: vehicles[seat], seat, is_online: true, is_host: false,
       });
 
-      const newPlayer: RoomPlayer = { userId, nickname, color: colors[seat], vehicle: vehicles[seat], seat, isOnline: true, isHost: false };
+      const newPlayer: RoomPlayer = { userId, nickname, color: colors[seat], vehicle: vehicles[seat], seat, isOnline: true, isHost: false, isBot: false };
+      const allPlayers = [...existingPlayers, newPlayer];
       set({ room: { id: room.id, code: room.code, hostId: room.host_id, mode: room.mode,
-        status: room.status, gameState: room.game_state, players: [...existingPlayers, newPlayer] }, myUserId: userId, loading: false });
+        status: room.status, gameState: room.game_state, players: allPlayers }, myUserId: userId, loading: false });
+      // Broadcast join so host sees immediately (don't rely on postgres_changes)
+      const tempCh = supabase.channel(`room:${room.code}`);
+      tempCh.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          tempCh.send({ type: 'broadcast', event: 'players_update', payload: { players: allPlayers } });
+        }
+      });
       return null;
     } catch (e: unknown) {
       set({ loading: false, error: String(e) });
@@ -144,10 +152,11 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   },
 
   setMode: async (mode) => {
-    const { room } = get();
+    const { room, channel } = get();
     if (!room) return;
     await supabase.from('rooms').update({ mode }).eq('id', room.id);
     set({ room: { ...room, mode } });
+    if (channel) channel.send({ type: 'broadcast', event: 'mode_update', payload: { mode } });
   },
 
   startGame: async (gameState) => {
@@ -191,6 +200,16 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       onPlayersChange(updated);
     });
 
+    // Players update broadcast (join/leave/bot changes)
+    ch.on('broadcast', { event: 'players_update' }, ({ payload }) => {
+      if (payload?.players) {
+        const players = payload.players as RoomPlayer[];
+        const { room: r } = get();
+        if (r) set({ room: { ...r, players } });
+        onPlayersChange(players);
+      }
+    });
+
     // Game state broadcast
     ch.on('broadcast', { event: 'game_state' }, ({ payload }) => {
       if (payload?.game) {
@@ -200,9 +219,17 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       }
     });
 
-    // Custom game events (dice, animation hints, etc.)
+    // Mode update
+    ch.on('broadcast', { event: 'mode_update' }, ({ payload }) => {
+      if (payload?.mode) {
+        const { room: r } = get();
+        if (r) set({ room: { ...r, mode: payload.mode as 'quick' | 'classic' } });
+      }
+    });
+
+    // Custom game events
     ch.on('broadcast', { event: '*' }, ({ event, payload }) => {
-      if (event !== 'game_state') onEvent(event, payload);
+      if (!['game_state','players_update','mode_update'].includes(event)) onEvent(event, payload);
     });
 
     // Room updates (players joining/leaving, mode change, game start)

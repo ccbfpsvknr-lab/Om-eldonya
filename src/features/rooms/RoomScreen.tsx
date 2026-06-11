@@ -97,8 +97,23 @@ export function RoomScreen() {
 
   const handleStart = async () => {
     if (!room) return;
-    // Will be triggered from here — GameBoard will handle online game init
-    navigate(`${ROUTES.create}?online=1`);
+    // Build player list from room players
+    const { usePlayersStore } = await import('@/store');
+    const { useGameStore } = await import('@/store');
+    const ps = usePlayersStore.getState();
+    const gs = useGameStore.getState();
+    // Reset and set up players from room
+    ps.resetPlayers();
+    room.players.forEach((p) => {
+      ps.addPlayer(p.nickname, p.vehicle);
+      // mark as bot if needed
+    });
+    // Set mode
+    gs.setConfig({ mode: room.mode });
+    // Push to playing + navigate
+    const { startGame } = useRoomStore.getState();
+    await startGame(useMatchStore.getState().game ?? {} as Game);
+    navigate(ROUTES.reveal);
   };
 
   const isHost = room?.hostId === userId;

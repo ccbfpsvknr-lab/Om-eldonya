@@ -8,6 +8,7 @@ import {
   useGameStore, usePlayersStore, useMatchStore, useModalStore,
   selectGame, selectCurrentPlayer, SALFA_AMOUNT,
 } from '@/store';
+import { useRoomStore } from '@/store/useRoomStore';
 import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL, totalUpgradeInvestment } from '@/game/engine/upgradeEngine';
 import { getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
 import { getCard } from '@/game/data/chanceCards';
