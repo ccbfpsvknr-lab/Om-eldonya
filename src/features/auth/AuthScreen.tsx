@@ -181,7 +181,7 @@ export function AuthScreen() {
 
         {/* ── Reset password form ── */}
         {tab === 'reset' && (<>
-          {field('الإيميل', email, setEmail, { type: 'email', placeholder: 'example@gmail.com' })}
+          {field('اسم المستخدم أو الإيميل', email, setEmail, { placeholder: 'ahmed123 أو email@gmail.com' })}
           {btn('ابعت رابط الاسترداد', handleReset)}
           <button onClick={() => { setTab('login'); clearMessages(); }}
             style={{ background: 'none', border: 'none', color: '#9AA6BC',

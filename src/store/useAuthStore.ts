@@ -11,7 +11,7 @@ interface AuthState {
 
   initialize:      ()                                                    => Promise<void>;
   signUp:          (email: string, password: string, username: string, nickname: string) => Promise<string | null>;
-  signIn:          (emailOrUsername: string, password: string)          => Promise<string | null>;
+  signIn:          (username: string, password: string)                 => Promise<string | null>;
   signOut:         ()                                                    => Promise<void>;
   resetPassword:   (email: string)                                       => Promise<string | null>;
   updateNickname:  (nickname: string)                                    => Promise<string | null>;
@@ -87,21 +87,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signIn: async (emailOrUsername, password) => {
+  signIn: async (username, password) => {
     set({ loading: true });
     try {
-      let email = emailOrUsername.trim().toLowerCase();
-      // If not an email, look up by username
-      if (!email.includes('@')) {
-        const { data, error: lookupErr } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('username', email)
-          .single();
-        if (lookupErr || !data?.email) return 'مش لاقيين اسم المستخدم ده';
-        email = data.email;
-      }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // Always login by username — look up email in profiles
+      const { data } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', username.trim().toLowerCase())
+        .single();
+      if (!data?.email) return 'اسم المستخدم ده مش موجود';
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password,
+      });
       if (error) return translateError(error.message);
       return null;
     } finally {
@@ -114,7 +113,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: null, profile: null, session: null });
   },
 
-  resetPassword: async (email) => {
+  resetPassword: async (usernameOrEmail) => {
+    let email = usernameOrEmail.trim().toLowerCase();
+    // If it looks like a username (no @), look up the email
+    if (!email.includes('@')) {
+      const { data } = await supabase
+        .from('profiles').select('email').eq('username', email).single();
+      if (!data?.email) return 'مش لاقيين اسم المستخدم ده';
+      email = data.email;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
     });
