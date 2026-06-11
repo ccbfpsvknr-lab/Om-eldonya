@@ -414,16 +414,17 @@ export function GameBoard() {
         animateAndMove(fromPos, steps, bLen, 0, () => {}); // animate to jail, no salary
       };
       if (isCurrentBot) {
-        // Defer jail animation 50ms so outer setIsMoving(false) runs first,
-        // then start fresh: setIsMoving(true) → animate → setIsMoving(false)
+        // Animate from police→jail, THEN call goToJail at end (avoids flash at jail)
         const policePos = player.position;
-        goToJail(pid2);
+        const capturedPid2 = pid2;
         setTimeout(() => {
           const gb = useMatchStore.getState().game;
           const jIdx3 = gb?.board.findIndex((t) => t.type === 'jail') ?? 7;
           const bLen3 = gb?.board.length ?? 24;
           const steps3 = ((jIdx3 - policePos) % bLen3 + bLen3) % bLen3 || bLen3;
-          animateAndMove(policePos, steps3, bLen3, 0, () => {});
+          animateAndMove(policePos, steps3, bLen3, 0, () => {
+            goToJail(capturedPid2); // set jail status after animation completes
+          });
         }, 60);
       } else {
         pid = open(
@@ -443,8 +444,11 @@ export function GameBoard() {
       const card = getCard(result.cardId);
       // ALL players see the card. Bots auto-trigger full effect after 2s.
       let cid = '';
+      let effectFired = false;          // guard: prevent double-trigger
       let doChanceEffect = () => {};
       doChanceEffect = () => {
+        if (effectFired) return;
+        effectFired = true;
         close(cid);
         if (card.skipNextTurn) { markSkipTurn(player.id); return; }
         if (card.type === 'move') {
@@ -1219,7 +1223,7 @@ export function GameBoard() {
                       </button>
                     </div>
 
-                    {(canEnd || canUpgradeAny || canSell) && (
+                    {!cp?.isBot && (canEnd || canUpgradeAny || canSell) && (
                       <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>
                         {canUpgradeAny && (
                           <button onClick={openUpgradeModal} style={{ flex: 1, borderRadius: '5px', padding: isFastBoard?'5px':'2px', fontSize: isFastBoard?'10px':'7px', fontWeight: 700, background: 'rgba(42,157,143,0.15)', border: '1px solid rgba(42,157,143,0.4)', color: '#2A9D8F', cursor: 'pointer' }}>🏗️ رقّي</button>
@@ -1256,9 +1260,11 @@ export function GameBoard() {
                       return (
                         <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '3px',
                           borderRadius: '5px', padding: isFastBoard?'4px 5px':'2px 3px',
-                          background: p.id===cp.id ? 'rgba(224,180,60,0.15)' : 'rgba(255,255,255,0.03)',
-                          border: p.id===cp.id ? '1px solid rgba(224,180,60,0.25)' : '1px solid transparent',
-                          borderRight: `3px solid ${p.color ?? '#888'}`,
+                          background: p.id===cp.id
+                            ? `${p.color ?? '#888'}30`
+                            : `${p.color ?? '#888'}12`,
+                          border: p.id===cp.id ? `1px solid ${p.color ?? '#888'}` : `1px solid ${p.color ?? '#888'}50`,
+                          borderLeft: `4px solid ${p.color ?? '#888'}`,
                           opacity: p.isActive ? 1 : 0.4 }}>
                           <span style={{ fontSize: (isFastBoard||isClassicRect)?'15px':'11px', lineHeight: 1, flexShrink: 0 }}>{p.vehicle}</span>
                           <span style={{ flex: 1, fontSize: isFastBoard?'11px':'7px', color: p.id===cp.id?'#F4CE5E':'#EADBB7',

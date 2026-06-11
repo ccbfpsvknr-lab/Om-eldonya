@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayersStore, selectCanStart, useGameStore } from '@/store';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useModal } from '@/hooks/useModal';
 import { ROUTES, PLAYER_LIMITS } from '@/lib/constants';
 import { cn } from '@/lib/cn';
@@ -18,6 +19,19 @@ export function PlayerSetup() {
   const setPhase    = useGameStore((s) => s.setPhase);
   const mode        = useGameStore((s) => s.config.mode);
   const maxPlayers  = mode === 'quick' ? 3 : 4;  // fast=3 classic=4
+
+  const profile = useAuthStore((s) => s.profile);
+  const resetPlayers = usePlayersStore((s) => s.resetPlayers);
+
+  // Pre-fill first player with account nickname on mount
+  useEffect(() => {
+    resetPlayers();
+    if (profile?.nickname) {
+      const veh = VEHICLES[0]?.emoji ?? '🚗';
+      addPlayer(profile.nickname, veh);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const takenVehicles   = new Set(players.map((p) => p.vehicle));
   const availableVehicles = VEHICLES.filter((v) => !takenVehicles.has(v.emoji));

@@ -69,7 +69,7 @@ export function buildCities(board: BoardTile[]): Record<string, City> {
         groupId: region,
         tileIndex: tile.index,
         price: tile.price ?? tier.price,
-        baseRent: tier.baseRent,
+        baseRent: tile.baseRent ?? tier.baseRent,
         level: 0,
         rent: [],
         buildCost: 0,

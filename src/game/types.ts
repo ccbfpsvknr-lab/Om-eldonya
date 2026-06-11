@@ -21,6 +21,7 @@ export interface BoardTile {
   projectId?: string;
   groupId?: string;
   price?: number;
+  baseRent?: number;
 }
 
 export type TileDef = Omit<BoardTile, 'index'>;
