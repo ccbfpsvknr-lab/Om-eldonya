@@ -65,6 +65,7 @@ export interface Player {
   jailTurns: number;
   /** Outstanding bank loan. Salary at Ramses pays this first. */
   solfaDebt: number;
+  solfaCount: number;   // how many solfas taken this game (max 3)
   /** True if free-pass from rent active (from a chance card). */
   hasRentFreePass: boolean;
   /** Turns remaining to skip (from chance card). */

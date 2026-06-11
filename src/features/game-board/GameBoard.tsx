@@ -8,7 +8,7 @@ import {
   useGameStore, usePlayersStore, useMatchStore, useModalStore,
   selectGame, selectCurrentPlayer, SALFA_AMOUNT,
 } from '@/store';
-import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL } from '@/game/engine/upgradeEngine';
+import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL, totalUpgradeInvestment } from '@/game/engine/upgradeEngine';
 import { getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
 import { getCard } from '@/game/data/chanceCards';
 import type { City, Player } from '@/game/types';
@@ -352,12 +352,19 @@ export function GameBoard() {
               markSkipTurn(player.id); return;
             }
             if (card.type === 'move') {
-              const cur = useMatchStore.getState().game?.players[game.currentPlayerIndex];
-              if (!cur) return;
-              const steps = card.toTile !== undefined
-                ? ((card.toTile - cur.position + game.board.length) % game.board.length)
-                : (card.spaces ?? 0);
-              if (steps !== 0) { movePlayer(steps); setTimeout(resolveLanding, 80); }
+              const g2 = useMatchStore.getState().game;
+              const cur = g2?.players[g2.currentPlayerIndex];
+              if (!cur || !g2) return;
+              const boardLen = g2.board.length;
+              const rawSteps = card.toTile !== undefined
+                ? ((card.toTile - cur.position + boardLen) % boardLen)  // always forward to target
+                : (card.spaces ?? 0); // can be negative (backwards)
+              if (rawSteps === 0) return;
+              const cashBefore = cur.cash;
+              movePlayer(rawSteps);
+              const after = useMatchStore.getState().game?.players[g2.currentPlayerIndex];
+              const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
+              animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
             } else if (card.type === 'police') {
               if (!isFast) goToJail(player.id); // police card never in fast deck anyway
             } else if (card.type === 'bonus' && card.rollAgain) {
@@ -485,20 +492,22 @@ export function GameBoard() {
 
   // ── Movement animation ────────────────────────────────────────────────────
   const animateAndMove = useCallback((from: number, steps: number, boardLen: number, salary: number) => {
-    if (steps <= 0) { resolveLanding(); return; }
+    if (steps === 0) { resolveLanding(); return; }
+    const dir = steps > 0 ? 1 : -1;
+    const absSteps = Math.abs(steps);
     setIsMoving(true);
     setAnimPos(from);
     let step = 0;
     let lastPos = from;
     moveRef.current = setInterval(() => {
       step++;
-      const nextPos = (from + step) % boardLen;
+      const nextPos = ((from + step * dir) % boardLen + boardLen) % boardLen;
       setSmokePos(lastPos);
       if (smokeClearRef.current) clearTimeout(smokeClearRef.current);
       smokeClearRef.current = setTimeout(() => setSmokePos(null), 520);
       lastPos = nextPos;
       setAnimPos(nextPos);
-      if (step >= steps) {
+      if (step >= absSteps) {
         clearInterval(moveRef.current!);
         setTimeout(() => {
           setAnimPos(null); setSmokePos(null);
@@ -987,6 +996,11 @@ export function GameBoard() {
                       <div style={{ fontSize: isFastBoard ? '13px' : '8px', fontWeight: 800, color: cp.cash < 0 ? '#E05656' : '#E0B43C', fontFamily: 'monospace', lineHeight: 1 }}>
                         {cp.cash.toLocaleString('en-US')}
                       </div>
+                      {cp.solfaDebt > 0 && (
+                        <div style={{ fontSize: isFastBoard ? '10px' : '7px', color: '#E05656', fontFamily: 'monospace', lineHeight: 1 }}>
+                          سلفة: {cp.solfaDebt.toLocaleString('en-US')}
+                        </div>
+                      )}
                     </div>
 
                     {myCities.length > 0 && (() => {
@@ -1082,6 +1096,8 @@ export function GameBoard() {
                       const cashStr = p.isActive
                         ? `${cashEmoji(Math.abs(p.cash))}${p.cash.toLocaleString('en-US')}`
                         : '💀';
+                      const debtStr = p.isActive && p.solfaDebt > 0
+                        ? `(${p.solfaDebt.toLocaleString('en-US')}-)` : '';
                       return (
                         <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '3px',
                           borderRadius: '5px', padding: isFastBoard?'4px 5px':'2px 3px',
@@ -1097,7 +1113,7 @@ export function GameBoard() {
                           {p.jailTurns > 0 && <span style={{ fontSize: (isFastBoard||isClassicRect)?'9px':'7px', flexShrink: 0 }}>🔒</span>}
                           <span style={{ fontSize: isFastBoard?'11px':'7px', fontWeight: 800,
                             color: p.cash<0?'#E05656':'#E0B43C', fontFamily: 'monospace', lineHeight: 1, flexShrink: 0 }}>
-                            {cashStr}
+                            {cashStr}{debtStr ? <span style={{color:'#E05656',fontSize:'85%'}}> {debtStr}</span> : null}
                           </span>
                         </div>
                       );
@@ -1221,7 +1237,7 @@ function UpgradeModal({ cities, playerId, onUpgrade, onClose }: {
                   {city.name}
                 </div>
                 <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                  {[0, 1, 2, 3].map((i) => (
+                  {[0, 1, 2].map((i) => (
                     <span key={i} style={{ fontSize: '12px', color: i < live.level ? rc : 'rgba(56,74,110,0.5)' }}>★</span>
                   ))}
                 </div>
@@ -1410,7 +1426,7 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
   const ownedCities = game ? Object.values(game.cities).filter((c) => c.ownerId === playerId) : [];
   useEffect(() => { if (player && player.cash >= 0) onClose(); }, [player?.cash, onClose]);
   if (!player || !game || player.cash >= 0) return null;
-  const canTakeSalfa = player.cash + SALFA_AMOUNT >= 0;
+  const canTakeSalfa = player.cash + SALFA_AMOUNT >= 0 && (player.solfaCount ?? 0) < 3;
   const hasOptions   = canTakeSalfa || ownedCities.length > 0;
   return (
     <div className="space-y-4" dir="rtl">
@@ -1667,7 +1683,7 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
                     </div>
                     {c.level > 0 && (
                       <div style={{ color: '#9AA6BC', fontFamily: 'monospace', fontSize: '0.7rem' }}>
-                        +{(Math.round(c.price * 0.15 * 0.75) * c.level).toLocaleString('en-US')} ترقيات
+                        +{totalUpgradeInvestment(c) > 0 ? Math.round(totalUpgradeInvestment(c) * 0.75).toLocaleString('en-US') : 0} ترقيات
                       </div>
                     )}
                     <div style={{ color: '#9AA6BC', fontSize: '0.65rem', fontFamily: "'Cairo'" }}>بيع المدينة كاملة</div>

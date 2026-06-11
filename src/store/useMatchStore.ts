@@ -52,6 +52,7 @@ interface MatchState {
   forfeitTurn: () => void;
   downgradeCityUpgrade: (cityId: string) => number;
   applyNewsEvent: (effect: string, amount: number) => void;
+  applyGain: (playerId: string, amount: number) => void;
   resolveJailTurn: (diceValue: number) => number;
   payAmount: (amount: number) => number;
   transferBetweenPlayers: (fromId: string, toId: string, amount: number) => void;
@@ -312,11 +313,14 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
   takeSalfa: (playerId) => set((s) => {
     if (!s.game) return s;
-    const players = s.game.players.map((p) =>
-      p.id === playerId ? {
-        ...p, cash: p.cash + SALFA_AMOUNT,
-        solfaDebt: p.solfaDebt + SALFA_AMOUNT,
-      } : p
+    const p = s.game.players.find((p) => p.id === playerId);
+    if (!p || p.solfaCount >= 3) return s; // max 3 solfas per game
+    const players = s.game.players.map((pl) =>
+      pl.id === playerId ? {
+        ...pl, cash: pl.cash + SALFA_AMOUNT,
+        solfaDebt: pl.solfaDebt + SALFA_AMOUNT,
+        solfaCount: pl.solfaCount + 1,
+      } : pl
     );
     return { game: { ...s.game, players } };
   }),
@@ -485,6 +489,25 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     });
   },
 
+
+  /** Apply a cash gain to a player — salfa debt is repaid first. */
+  applyGain: (playerId: string, amount: number) => {
+    set((s) => {
+      if (!s.game || amount <= 0) return s;
+      const players = s.game.players.map((p) => {
+        if (p.id !== playerId) return p;
+        let gain = amount;
+        let debt = p.solfaDebt;
+        if (debt > 0) {
+          const pay = Math.min(gain, debt);
+          gain -= pay; debt -= pay;
+        }
+        return { ...p, cash: p.cash + gain, solfaDebt: debt };
+      });
+      return { game: { ...s.game, players } };
+    });
+  },
+
   applyNewsEvent: (effect, amount) => {
     const g = get().game;
     if (!g) return;
@@ -536,7 +559,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     const players = g.players.map((p) =>
       p.id === city.ownerId ? { ...p, cash: p.cash + refund } : p
     );
-    set({ game: { ...g, players, cities } });
+    set({ game: { ...g, players, cities, hasUpgradedThisTurn: true } });
     return refund;
   },
 

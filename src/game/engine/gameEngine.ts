@@ -31,6 +31,7 @@ export function toGamePlayers(lobby: LobbyPlayer[], startingCash: number): Playe
     laps: 0,
     jailTurns: 0,
     solfaDebt: 0,
+    solfaCount: 0,
     skipTurns: 0,
     hasRentFreePass: false,
     jailCount: 0,
