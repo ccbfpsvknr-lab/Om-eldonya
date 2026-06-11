@@ -286,7 +286,8 @@ export function GameBoard() {
       const city = g.cities[tile.cityId];
       if (!city) return;
       if (city.ownerId === null) {
-        const mid = open(
+        let mid = '';
+        mid = open(
           <BuyCityModal city={city} canAfford={player.cash >= city.price}
             onBuy={() => {
               buyCity(city.id); close(mid);
@@ -318,7 +319,8 @@ export function GameBoard() {
     } else if (tile.type === 'police') {
       // All modes: land on police = go to jail
       goToJail(player.id);
-      const pid = open(
+      let pid = '';
+      pid = open(
         <div className="text-center space-y-5">
           <div className="text-8xl">🚔</div>
           <h2 className="text-4xl font-extrabold text-gold-sheen">كلابوووش!</h2>
@@ -332,7 +334,8 @@ export function GameBoard() {
       const result = drawChance();
       if (!result) return;
       const card = getCard(result.cardId);
-      const cid = open(
+      let cid = '';
+      cid = open(
         <div className="space-y-4 text-center">
           <div className="text-5xl">🎴</div>
           <Badge tone="gold">نصيبك هيصيبك</Badge>
@@ -404,9 +407,13 @@ export function GameBoard() {
 
     } else if (tile.type === 'project') {
       if (tile.name === 'الديوان المحلي') {
-        // Choice required — use modal
         const canAffordBribe = player.cash >= 300;
-        const did = open(
+        const pid = player.id;
+        // Use close callback ref pattern to avoid any TDZ edge case
+        let govModalId = '';
+        const onWait = () => { markSkipTurn(pid); close(govModalId); };
+        const onPay  = () => { payAmount(300); checkInsolvency(pid); close(govModalId); };
+        govModalId = open(
           <div className="space-y-4 text-center" dir="rtl">
             <div className="text-5xl">🏛️</div>
             <h3 className="text-2xl font-extrabold text-gold-sheen">الديوان المحلي</h3>
@@ -414,14 +421,13 @@ export function GameBoard() {
               الموظف مش موجود… السيستم واقع… والأوراق ضاعت 😤<br/>تدفع ولا تستنى؟
             </p>
             <div className="flex gap-3">
-              <button onClick={() => { markSkipTurn(player.id); close(did); }}
+              <button onClick={onWait}
                 className="flex-1 rounded-xl py-3 text-sm font-bold"
                 style={{ background: 'rgba(22,34,58,0.8)', border: '1px solid rgba(56,74,110,0.6)', color: '#9AA6BC', cursor: 'pointer' }}>
                 استنى الدور الجاي 😤
               </button>
-              <button
+              <button onClick={onPay}
                 disabled={!canAffordBribe}
-                onClick={() => { if (canAffordBribe) { payAmount(300); checkInsolvency(player.id); close(did); } }}
                 className="flex-1 rounded-xl py-3 text-sm font-bold"
                 style={{
                   background: canAffordBribe ? 'linear-gradient(135deg,#E8C040,#C49020)' : 'rgba(56,74,110,0.3)',
@@ -473,7 +479,9 @@ export function GameBoard() {
       checkInsolvency(player.id);
     }
   }, [open, close, buyCity, payRent, payTax, goToJail, drawChance, movePlayer,
-      showToast, checkInsolvency, endTurn, markSkipTurn, isFast, game]);
+      showToast, checkInsolvency, endTurn, markSkipTurn,
+      payAmount, transferBetweenPlayers, applyNewsEvent, forfeitTurn,
+      isFast, game]);
 
   // ── Movement animation ────────────────────────────────────────────────────
   const animateAndMove = useCallback((from: number, steps: number, boardLen: number, salary: number) => {
