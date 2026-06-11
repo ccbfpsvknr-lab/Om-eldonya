@@ -128,13 +128,6 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       const allPlayers = [...existingPlayers, newPlayer];
       set({ room: { id: room.id, code: room.code, hostId: room.host_id, mode: room.mode,
         status: room.status, gameState: room.game_state, players: allPlayers }, myUserId: userId, loading: false });
-      // Broadcast join so host sees immediately (don't rely on postgres_changes)
-      const tempCh = supabase.channel(`room:${room.code}`);
-      tempCh.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          tempCh.send({ type: 'broadcast', event: 'players_update', payload: { players: allPlayers } });
-        }
-      });
       return null;
     } catch (e: unknown) {
       set({ loading: false, error: String(e) });
@@ -261,7 +254,12 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
     ch.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await ch.track({ userId: myUserId, online_at: new Date().toISOString() });
+        await ch.track({ userId: myUserId ?? 'guest', online_at: new Date().toISOString() });
+        // Announce current players list when joining (host sees new member instantly)
+        const { room: r } = get();
+        if (r) {
+          ch.send({ type: 'broadcast', event: 'players_update', payload: { players: r.players } });
+        }
       }
     });
 
