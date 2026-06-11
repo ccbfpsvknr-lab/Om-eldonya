@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
-import { randomNickname } from '@/lib/nicknames';
+
 import { ROUTES } from '@/lib/constants';
 
 type Tab = 'login' | 'register' | 'reset';
