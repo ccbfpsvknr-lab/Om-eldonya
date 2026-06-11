@@ -50,7 +50,7 @@ export function AuthScreen() {
   const btn = (text: string, onClick: () => void, gold = true) => (
     <button onClick={onClick} disabled={loading}
       style={{
-        width: '100%', padding: '14px', borderRadius: 14, border: 'none',
+        width: '100%', padding: '14px', borderRadius: 14,
         fontFamily: "'Cairo', sans-serif", fontSize: '1rem', fontWeight: 800,
         cursor: loading ? 'not-allowed' : 'pointer',
         opacity: loading ? 0.7 : 1,
