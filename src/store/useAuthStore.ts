@@ -60,10 +60,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
         options: { data: { username: normalizedUsername, nickname: nickname.trim() } },
       });
-      if (error) {
-        // Show raw error for debugging — remove after fixing
-        return `${error.message || JSON.stringify(error)}`;
-      }
+      if (error) return translateError(error.message);
       return null;
     } finally {
       set({ loading: false });

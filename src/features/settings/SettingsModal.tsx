@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '@/lib/constants';
+
 
 interface Props { onClose: () => void; }
 
 export function SettingsModal({ onClose }: Props) {
   const { profile, updateNickname, signOut, loading } = useAuthStore();
-  const navigate = useNavigate();
   const [newNick, setNewNick] = useState(profile?.nickname ?? '');
   const [msg, setMsg]         = useState('');
   const [isError, setIsError] = useState(false);
@@ -86,7 +84,7 @@ export function SettingsModal({ onClose }: Props) {
 
       {/* Admin panel — only for admins */}
       {profile?.is_admin && (
-        <button onClick={() => { navigate(ROUTES.admin); }}
+        <button onClick={() => { window.location.href = '/admin'; }}
           style={{
             padding: '12px', borderRadius: 12,
             border: '1px solid rgba(224,180,60,0.35)',
