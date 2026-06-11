@@ -46,6 +46,7 @@ interface RoomState {
   markReconnected:  (userId: string) => void;
   addBot:           ()               => Promise<void>;
   removeBot:        (userId: string) => Promise<void>;
+  updateVehicle:    (userId: string, vehicle: string) => void;
 }
 
 // Generate readable 4-char room code
@@ -220,9 +221,22 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       }
     });
 
-    // Custom game events
-    ch.on('broadcast', { event: '*' }, ({ event, payload }) => {
-      if (!['game_state','players_update','mode_update'].includes(event)) onEvent(event, payload);
+    // Vehicle update
+    ch.on('broadcast', { event: 'vehicle_update' }, ({ payload }) => {
+      if (payload?.userId && payload?.vehicle) {
+        const { room: r } = get();
+        if (!r) return;
+        const players = r.players.map((p) =>
+          p.userId === payload.userId ? { ...p, vehicle: payload.vehicle as string } : p
+        );
+        set({ room: { ...r, players } });
+        onPlayersChange(players);
+      }
+    });
+
+    // Game start event — explicit handler (wildcards don't work in Supabase)
+    ch.on('broadcast', { event: 'game_start' }, ({ payload }) => {
+      onEvent('game_start', payload);
     });
 
     // Room updates (players joining/leaving, mode change, game start)
@@ -296,6 +310,14 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     if (!room) return;
     await supabase.from('room_players').delete().eq('room_id', room.id).eq('user_id', userId);
     set({ room: { ...room, players: room.players.filter((p) => p.userId !== userId) } });
+  },
+
+  updateVehicle: (userId, vehicle) => {
+    const { room, channel } = get();
+    if (!room) return;
+    const players = room.players.map((p) => p.userId === userId ? { ...p, vehicle } : p);
+    set({ room: { ...room, players } });
+    if (channel) channel.send({ type: 'broadcast', event: 'vehicle_update', payload: { userId, vehicle } });
   },
 
   markDisconnected: (userId) => {

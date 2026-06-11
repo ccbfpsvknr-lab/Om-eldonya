@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoomStore, type RoomPlayer } from '@/store/useRoomStore';
 import { usePlayersStore, useGameStore } from '@/store';
+import { VEHICLES } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ROUTES } from '@/lib/constants';
 
@@ -37,9 +38,10 @@ const S = {
 export function RoomScreen() {
   const navigate   = useNavigate();
   const { profile } = useAuthStore();
-  const { room, loading, error, createRoom, joinRoom, leaveRoom, setMode, subscribe, unsubscribe, addBot, removeBot } = useRoomStore();
+  const { room, loading, error, createRoom, joinRoom, leaveRoom, setMode, subscribe, unsubscribe, addBot, removeBot, updateVehicle } = useRoomStore();
 
   const [tab, setTab]       = useState<Tab>('create');
+  const [pickingVehicle, setPickingVehicle] = useState<string | null>(null); // userId picking
   const [code, setCode]     = useState('');
   const [msg, setMsg]       = useState('');
   const [isErr, setIsErr]   = useState(false);
@@ -203,7 +205,13 @@ export function RoomScreen() {
                   }}>
                     {p ? (
                       <>
-                        <span style={{ fontSize: '1.4rem' }}>{p.vehicle}</span>
+                        <span
+                          style={{ fontSize: '1.4rem', cursor: (p.userId === userId || (isHost && p.isBot)) ? 'pointer' : 'default' }}
+                          onClick={() => {
+                            if (p.userId === userId || (isHost && p.isBot)) setPickingVehicle(p.userId);
+                          }}
+                          title="اضغط لتغيير العربية"
+                        >{p.vehicle} {(p.userId === userId || (isHost && p.isBot)) ? <span style={{fontSize:'0.6rem', color:'#9AA6BC'}}>✏️</span> : null}</span>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 800, color: p.color, fontSize: '0.95rem', fontFamily: "'Cairo'" }}>
                             {p.nickname}
@@ -234,6 +242,40 @@ export function RoomScreen() {
               })}
             </div>
           </div>
+
+          {/* Vehicle picker overlay */}
+          {pickingVehicle && (
+            <div style={{ ...S.card, marginBottom: 14 }}>
+              <p style={{ ...S.label, marginBottom: 10 }}>اختر عربيتك 🚗</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {VEHICLES.map((v) => {
+                  const taken = room.players.some((p) => p.userId !== pickingVehicle && p.vehicle === v.emoji);
+                  return (
+                    <button key={v.emoji}
+                      disabled={taken}
+                      onClick={() => {
+                        updateVehicle(pickingVehicle, v.emoji);
+                        setPickingVehicle(null);
+                      }}
+                      style={{
+                        padding: '12px 0', borderRadius: 10, border: 'none',
+                        background: taken ? 'rgba(14,23,38,0.3)' : 'rgba(14,23,38,0.8)',
+                        fontSize: '1.8rem', cursor: taken ? 'not-allowed' : 'pointer',
+                        opacity: taken ? 0.3 : 1,
+                      }}>
+                      {v.emoji}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setPickingVehicle(null)}
+                style={{ marginTop: 10, width: '100%', padding: '8px', borderRadius: 8, border: 'none',
+                  background: 'rgba(154,166,188,0.1)', color: '#9AA6BC',
+                  fontFamily: "'Cairo'", fontWeight: 700, cursor: 'pointer' }}>
+                إلغاء
+              </button>
+            </div>
+          )}
 
           {/* Start button (host only, min 2 players) */}
           {isHost && room.players.length >= 2 && (
