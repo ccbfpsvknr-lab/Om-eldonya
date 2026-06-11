@@ -61,11 +61,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         options: { data: { username: normalizedUsername, nickname: nickname.trim() } },
       });
       if (error) {
-        if (error.message.includes('already registered') || error.message.includes('already been registered'))
-          return 'الإيميل ده متسجل بالفعل';
-        return translateError(error.message);
+        // Show raw error for debugging — remove after fixing
+        return `${error.message || JSON.stringify(error)}`;
       }
-      return null; // success — user should verify email
+      return null;
     } finally {
       set({ loading: false });
     }
