@@ -9,6 +9,8 @@ export interface Profile {
   id: string;
   username: string;
   nickname: string;
+  email?: string;
   coins: number;
   created_at: string;
+  is_admin?: boolean;
 }
