@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoomStore, type RoomPlayer } from '@/store/useRoomStore';
+import { usePlayersStore, useGameStore } from '@/store';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ROUTES } from '@/lib/constants';
 
@@ -9,6 +10,7 @@ type Tab = 'create' | 'join';
 const S = {
   page: {
     minHeight: '100dvh', background: '#0E1726', padding: '16px',
+    paddingTop: 'max(env(safe-area-inset-top), 16px)',
     fontFamily: "'Cairo', sans-serif", direction: 'rtl' as const, color: '#EADBB7',
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
   },
@@ -95,25 +97,43 @@ export function RoomScreen() {
 
   const handleLeave = async () => { await leaveRoom(); };
 
+  const resetPlayers = usePlayersStore((s) => s.resetPlayers);
+  const addPlayer    = usePlayersStore((s) => s.addPlayer);
+  const toggleBot    = usePlayersStore((s) => s.toggleBot);
+  const setConfig    = useGameStore((s) => s.setConfig);
+
   const handleStart = async () => {
     if (!room) return;
-    // Build player list from room players
-    const { usePlayersStore } = await import('@/store');
-    const { useGameStore } = await import('@/store');
-    const ps = usePlayersStore.getState();
-    const gs = useGameStore.getState();
-    // Reset and set up players from room
-    ps.resetPlayers();
-    room.players.forEach((p) => {
-      ps.addPlayer(p.nickname, p.vehicle);
-      // mark as bot if needed
-    });
-    // Set mode
-    gs.setConfig({ mode: room.mode });
-    // Push to playing + navigate
-    const { startGame } = useRoomStore.getState();
-    await startGame(useMatchStore.getState().game ?? {} as Game);
-    navigate(ROUTES.reveal);
+    try {
+      // Set up local player store from room roster
+      resetPlayers();
+      room.players.forEach((p) => {
+        addPlayer(p.nickname, p.vehicle);
+      });
+      // Mark bots
+      room.players.forEach((p, i) => {
+        if (p.isBot) toggleBot(i);
+      });
+      // Set game mode
+      setConfig({ mode: room.mode });
+      // Update room status in DB
+      const { supabase } = await import('@/lib/supabase');
+      await supabase.from('rooms').update({ status: 'playing' }).eq('id', room.id);
+      useRoomStore.setState((s) => ({
+        room: s.room ? { ...s.room, status: 'playing' } : null,
+      }));
+      // Broadcast "game_start" so all non-host players also navigate
+      const ch = useRoomStore.getState().channel;
+      if (ch) {
+        ch.send({
+          type: 'broadcast', event: 'game_start',
+          payload: { players: room.players, mode: room.mode },
+        });
+      }
+      navigate(ROUTES.reveal);
+    } catch (e) {
+      showMsg(String(e), true);
+    }
   };
 
   const isHost = room?.hostId === userId;

@@ -857,12 +857,12 @@ export function GameBoard() {
   // min(screenW, screenH × W/H)  →  fits the larger screen dimension, centers on the smaller
   const boardWidth  = `min(100dvw, calc(100dvh * ${gridFrW} / ${gridFrH}))`;
   const boardHeight = `min(100dvh, calc(100dvw * ${gridFrH} / ${gridFrW}))`;
-  const gridCols    = isFastBoard ? '2fr 1fr 1fr 1fr 1fr 2fr'
-                     : isClassicRect ? '2fr 1fr 1fr 1fr 1fr 1fr 1fr 2fr'
-                     : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
-  const gridRows    = isFastBoard ? '2fr 1fr 1fr 2fr'
-                     : isClassicRect ? '2fr 1fr 1fr 1fr 1fr 2fr'
-                     : `2fr repeat(${tilesPerSide - 1}, 1fr) 2fr`;
+  const gridCols    = isFastBoard ? '1.4fr 1fr 1fr 1fr 1fr 1.4fr'
+                     : isClassicRect ? '1.4fr 1fr 1fr 1fr 1fr 1fr 1fr 1.4fr'
+                     : `1.4fr repeat(${tilesPerSide - 1}, 1fr) 1.4fr`;
+  const gridRows    = isFastBoard ? '1.4fr 1fr 1fr 1.4fr'
+                     : isClassicRect ? '1.4fr 1fr 1fr 1fr 1fr 1.4fr'
+                     : `1.4fr repeat(${tilesPerSide - 1}, 1fr) 1.4fr`;
   const centerCol   = isFastBoard ? '2 / 6'
                      : isClassicRect ? '2 / 8'
                      : `2 / ${gridSize}`;
@@ -1571,7 +1571,7 @@ function TradeModal({ currentPlayerId, partners, onTrade, onClose }: {
     </div>
   );
   if (step === 'configure' && target) return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <CityPicker label="اللي هتعرضه:" cities={myC} sel={offerC} setSel={setOfferC} cash={offerX} setCash={setOfferX} max={me.cash} color="text-gold" />
       <CityPicker label="اللي عايزه منه:" cities={theirC} sel={reqC} setSel={setReqC} cash={reqX} setCash={setReqX} max={them?.cash??0} color="text-teal" />
       <div className="flex gap-2">
@@ -1585,7 +1585,7 @@ function TradeModal({ currentPlayerId, partners, onTrade, onClose }: {
     </div>
   );
   if (step === 'confirm' && target) return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div style={{ borderRadius: '12px', border: '1px solid rgba(224,180,60,0.2)', background: 'rgba(22,15,4,0.9)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <p className="text-center text-xs text-muted">ديّ الموبايل لـ <strong className="text-content">{target.name}</strong></p>
         <Summary title={`${me.name} بيعرض:`} cIds={offerC} cash={offerX} />
@@ -1616,7 +1616,7 @@ function TradeModal({ currentPlayerId, partners, onTrade, onClose }: {
     </div>
   );
   if (step === 'counter-confirm' && target) return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div style={{ borderRadius: '12px', border: '1px solid rgba(42,157,143,0.2)', background: 'rgba(4,22,18,0.9)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <p className="text-center text-xs text-muted">ديّ الموبايل لـ <strong className="text-content">{me.name}</strong></p>
         <Summary title={`${target.name} بيعرض:`} cIds={ctrOC} cash={ctrOX} />
@@ -1646,7 +1646,7 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
   const canTakeSalfa = player.cash + SALFA_AMOUNT >= 0 && (player.solfaCount ?? 0) < 1;
   const hasOptions   = canTakeSalfa || ownedCities.length > 0;
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div style={{ textAlign: 'center', padding: '8px 0' }}>
         <div style={{ fontSize: '48px', marginBottom: '8px' }}>😰</div>
         <h3 style={{ fontFamily: "'Cairo'", fontWeight: 800, fontSize: '1.1rem', color: '#EADBB7' }}>مفيش فلوس!</h3>
@@ -1714,7 +1714,7 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
   const ownedCities = Object.values(game.cities).filter((c) => c.ownerId === currentPlayerId);
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* ── Portrait overlay — ask user to rotate ── */}
       {isPortrait && (
         <div style={{

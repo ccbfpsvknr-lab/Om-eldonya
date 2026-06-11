@@ -121,7 +121,7 @@
 @layer utilities {
   /* Respect safe areas on notched phones (mobile-first) */
   .pt-safe {
-    padding-top: max(env(safe-area-inset-top), 0px);
+    padding-top: max(env(safe-area-inset-top), 12px);
   }
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 0px);
