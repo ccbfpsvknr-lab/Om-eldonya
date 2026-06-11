@@ -748,20 +748,24 @@ export function GameBoard() {
     if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
 
     if (phase === 'rolling') {
-      // Bot "thinks" then rolls
+      const myPlayerId = cp.id;
       const t = setTimeout(() => {
         const g2 = useMatchStore.getState().game;
-        if (g2?.players[g2.currentPlayerIndex]?.isBot) handleRoll();
+        // Only roll if it's still THIS bot's turn
+        if (g2?.players[g2.currentPlayerIndex]?.id === myPlayerId) handleRoll();
       }, 700 + Math.random() * 500);
       return () => clearTimeout(t);
     }
 
     if (phase === 'turn-end' && openModalCount === 0 && !rollAgainPending) {
-      // Bot considers upgrading before ending turn
+      // Capture THIS bot's player id — prevents a stale timeout from ending
+      // the NEXT bot's turn when fast-mode auto-end already advanced the game.
+      const myPlayerId = cp.id;
       const t = setTimeout(() => {
         const g2 = useMatchStore.getState().game;
         const cur = g2?.players[g2?.currentPlayerIndex ?? -1];
-        if (!g2 || !cur?.isBot) return;
+        // Only act if it's still THIS bot's turn
+        if (!g2 || !cur?.isBot || cur.id !== myPlayerId) return;
         // Upgrade: own full region, can afford, hasn't upgraded yet
         if (!g2.hasUpgradedThisTurn) {
           const cities = Object.values(g2.cities);
@@ -778,7 +782,8 @@ export function GameBoard() {
         }
         setTimeout(() => {
           const g3 = useMatchStore.getState().game;
-          if (g3?.players[g3.currentPlayerIndex]?.isBot) handleEndTurn();
+          // Double-check: still this bot's turn
+          if (g3?.players[g3.currentPlayerIndex]?.id === myPlayerId) handleEndTurn();
         }, 400);
       }, 600);
       return () => clearTimeout(t);

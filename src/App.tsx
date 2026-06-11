@@ -11,6 +11,18 @@ import { AppRouter } from '@/router';
  */
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize);
+
+  // Try to lock orientation to landscape (works in installed PWAs on Android)
+  useEffect(() => {
+    const lock = async () => {
+      try {
+        await (screen.orientation as any)?.lock?.('landscape');
+      } catch {
+        // Not supported on this device/browser — portrait overlay handles it
+      }
+    };
+    lock();
+  }, []);
   useEffect(() => { initialize(); }, [initialize]);
 
   return (

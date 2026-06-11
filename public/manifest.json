@@ -1,0 +1,17 @@
+{
+  "name": "أم الدنيا",
+  "short_name": "أم الدنيا",
+  "description": "لعبة جماعية ممتعة مع أصحابك",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0E1726",
+  "theme_color": "#0E1726",
+  "icons": [
+    {
+      "src": "/scarab.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
