@@ -14,7 +14,7 @@ export function AuthScreen() {
   const [email, setEmail]     = useState('');
   const [password, setPass]   = useState('');
   const [username, setUser]   = useState('');
-  const [nickname, setNick]   = useState(() => randomNickname([]));
+  const [nickname, setNick]   = useState('');
   const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
 
