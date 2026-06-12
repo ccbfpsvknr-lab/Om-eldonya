@@ -114,7 +114,11 @@ export function GameBoard() {
 
   // ── Online: which game player am I? ─────────────────────────────────────
   const isOnlineHost = isOnlineGame && room?.hostId === myUserId;
-  const [syncReady, setSyncReady] = useState(() => !isOnlineGame || (!!room && room.hostId === myUserId));
+  const [syncReady, setSyncReady] = useState(() => {
+    if (!isOnlineGame) return true;           // offline game — always ready
+    if (room?.hostId === myUserId) return true; // host — game initialized locally
+    return !!useMatchStore.getState().game;    // non-host — ready if game already loaded
+  });
 
   // My seat in the room → maps to game player index
   const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0;

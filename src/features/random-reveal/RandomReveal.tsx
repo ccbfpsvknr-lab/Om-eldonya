@@ -49,14 +49,16 @@ export function RandomReveal() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineGame, isOnlineHost]);
 
-  const proceed = () => {
+  const proceed = async () => {
     createMatch({ mode, players: order });
     setPhase('playing');
-    // Write game state to Supabase for non-host to receive
+    // AWAIT the DB write so non-host can poll it before we navigate away
     if (isOnlineHost && room) {
-      const game = useMatchStore.getState().game;
-      if (game) {
-        supabase.from('rooms').update({ status: 'playing', game_state: game }).eq('id', room.id);
+      const g = useMatchStore.getState().game;
+      if (g) {
+        await supabase.from('rooms')
+          .update({ status: 'playing', game_state: g })
+          .eq('id', room.id);
         useRoomStore.setState((s) => ({
           room: s.room ? { ...s.room, status: 'playing' } : null,
         }));
@@ -180,8 +182,8 @@ export function RandomReveal() {
 
       {/* Footer */}
       <div className="relative z-10 px-4 pt-3 pb-4 flex-shrink-0">
-        <button onClick={isOnlineGame && !isOnlineHost ? undefined : proceed}
-          disabled={isOnlineGame && !isOnlineHost} disabled={order.length === 0}
+        <button onClick={isOnlineGame && !isOnlineHost ? undefined : () => { void proceed(); }}
+          disabled={(isOnlineGame && !isOnlineHost) || order.length === 0}
           className="w-full rounded-2xl py-4 font-bold transition-all active:scale-[0.98] disabled:opacity-40"
           style={{
             background: 'linear-gradient(135deg, #E8C040, #C49020)',
