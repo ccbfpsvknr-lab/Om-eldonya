@@ -63,7 +63,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         profileData = { ...profileData, coins: 5 };
         set({ user: session.user, session, profile: profileData, showWelcome: true });
       } else {
-        set({ user: session.user, session, profile: profileData ?? null });
+        // Update last_seen_at so friends can see when you were online
+      if (session?.user?.id) supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
+      set({ user: session.user, session, profile: profileData ?? null });
       }
     }
     set({ initialized: true });

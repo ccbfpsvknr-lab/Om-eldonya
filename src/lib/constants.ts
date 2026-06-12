@@ -12,6 +12,8 @@ export const ROUTES = {
   admin:  '/admin',
   rooms:  '/rooms',
   rules:  '/rules',
+  play:      '/play',
+  friends:   '/friends',
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

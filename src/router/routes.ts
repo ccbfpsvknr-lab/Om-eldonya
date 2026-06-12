@@ -57,6 +57,20 @@ export const appRoutes: AppRoute[] = [
     ),
   },
   {
+    path: ROUTES.friends,
+    label: 'الأصدقاء',
+    Component: lazy(() =>
+      import('@/features/friends/FriendsScreen').then((m) => ({ default: m.FriendsScreen })),
+    ),
+  },
+  {
+    path: ROUTES.play,
+    label: 'يلا بينا',
+    Component: lazy(() =>
+      import('@/features/game-mode/GameModeScreen').then((m) => ({ default: m.GameModeScreen })),
+    ),
+  },
+  {
     path: ROUTES.rules,
     label: 'القواعد',
     Component: lazy(() =>

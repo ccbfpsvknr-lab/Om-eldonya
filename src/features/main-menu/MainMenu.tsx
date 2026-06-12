@@ -76,6 +76,7 @@ export function MainMenu() {
   }, [showWelcome]);
 
   const openRooms = () => { if (!user) { navigate(ROUTES.auth); return; } navigate(ROUTES.rooms); };
+  const openFriends = () => { if (!user) { navigate(ROUTES.auth); return; } navigate(ROUTES.friends); };
 
   const openSettings = () => {
     if (!user) { navigate(ROUTES.auth); return; }
@@ -87,7 +88,7 @@ export function MainMenu() {
   const { open, close } = useModal();
   const createGame = useGameStore((s) => s.createGame);
 
-  const handleStart = () => { createGame(); navigate(ROUTES.create); };
+  const handleStart = () => { navigate(ROUTES.play); };
   const handleRules = () => { navigate(ROUTES.rules); };
 
   return (
@@ -351,7 +352,7 @@ export function MainMenu() {
           </button>
 
           {/* الأصدقاء */}
-          <button onClick={openRooms}
+          <button onClick={openFriends}
             style={{ borderRadius: 20, border: '1px solid rgba(78,130,255,0.35)', cursor: 'pointer',
               padding: '22px 10px', background: 'rgba(22,34,58,0.9)',
               fontFamily: "'Cairo', sans-serif", transition: 'transform 0.15s',
