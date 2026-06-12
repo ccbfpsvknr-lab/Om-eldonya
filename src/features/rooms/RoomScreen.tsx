@@ -69,7 +69,7 @@ export function RoomScreen() {
           if (p.isBot && currentP[i]) ps.toggleBot(currentP[i].id);
         });
         useGameStore.getState().setMode(mode);
-        navigate(ROUTES.reveal);
+        navigate(ROUTES.board);  // skip reveal — wait for host game state
       }
     }, 1500);
     return () => clearInterval(poll);

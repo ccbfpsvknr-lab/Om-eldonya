@@ -142,10 +142,15 @@ export function GameBoard() {
   // ── Host: push initial game state so non-hosts can sync ──────────────────
   useEffect(() => {
     if (!isOnlineHost) return;
-    const g = useMatchStore.getState().game;
-    if (!g) return;
-    // Push initial state; non-hosts will receive it and unsee loading screen
-    pushGameState(g);
+    // Push immediately + retry at 1s in case non-host subscribes slightly late
+    const push = () => {
+      const g = useMatchStore.getState().game;
+      if (g) pushGameState(g);
+    };
+    push();
+    const t1 = setTimeout(push, 1000);
+    const t2 = setTimeout(push, 3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineHost]);
 
@@ -285,6 +290,24 @@ export function GameBoard() {
     const ok = await confirm({ title: 'إنهاء اللعبة', message: 'لو خرجت دلوقتي، اللعبة راحت مع الريح. متأكد؟', confirmLabel: 'اخرج', danger: true });
     if (ok) { resetMatch(); resetGame(); resetPlayers(); navigate(ROUTES.home); }
   };
+
+  // Online non-host: no local game yet — show loading until host pushes state
+  if ((!game || !cp) && isOnlineGame && !isOnlineHost) return (
+    <div style={{
+      position: 'fixed', inset: 0, background: '#0E1726',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: 16,
+      fontFamily: "'Cairo', sans-serif",
+    }}>
+      <div style={{ fontSize: 52 }}>🎲</div>
+      <h2 style={{ color: '#E0B43C', fontWeight: 900, fontSize: '1.3rem', margin: 0 }}>
+        جاري تحميل اللعبة...
+      </h2>
+      <p style={{ color: '#9AA6BC', fontSize: '0.85rem', margin: 0 }}>
+        في انتظار الهوست يبدأ
+      </p>
+    </div>
+  );
 
   if (!game || !cp) return (
     <div className="flex h-[100dvh] items-center justify-center bg-bg">
