@@ -9,6 +9,7 @@ import {
   selectGame, selectCurrentPlayer, SALFA_AMOUNT,
 } from '@/store';
 import { useRoomStore } from '@/store/useRoomStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL, totalUpgradeInvestment } from '@/game/engine/upgradeEngine';
 import { getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
@@ -96,6 +97,7 @@ const cashEmoji = (n: number): string =>
 export function GameBoard() {
   const navigate    = useNavigate();
   const { room, myUserId, pushGameState, subscribe, unsubscribe, markDisconnected, markReconnected, broadcastAction } = useRoomStore();
+  const profile = useAuthStore((s) => s.profile);
   const isOnlineGame = !!room && room.status === 'playing';
   const { confirm, open, close } = useModal();
 
@@ -120,8 +122,11 @@ export function GameBoard() {
     return !!useMatchStore.getState().game;    // non-host — ready if game already loaded
   });
 
-  // My seat in the room → maps to game player index
-  const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0;
+  // Find my player in the game by nickname — works correctly regardless of shuffle order
+  const myNickname  = profile?.nickname ?? '';
+  const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0; // kept for room checks only
+  // Use this everywhere instead of myRoomSeat for game logic:
+  const myGameIdx   = game ? game.players.findIndex((p) => p.name === myNickname) : -1;
 
   // Refs for action handlers — avoids stale closures in the subscribe callback
   const actionRef = useRef<{
@@ -145,11 +150,17 @@ export function GameBoard() {
       if (isMyTurn || isMyBotTurn) return;
 
       const { data } = await supabase.from('rooms').select('game_state').eq('id', room.id).single();
-      // Only apply if it's a REAL game state (has board array), not lobby/preGame data
+      // Only apply REAL game state (has board) and only if it's not older than current
       if (data?.game_state?.board) {
         const incoming = data.game_state;
-        useMatchStore.setState({ game: incoming });
-        setSyncReady(true);
+        const cur = useMatchStore.getState().game;
+        const incomingTurn = (incoming.turnCount ?? 0) * 10 + (incoming.currentPlayerIndex ?? 0);
+        const currentTurn  = (cur?.turnCount ?? 0) * 10 + (cur?.currentPlayerIndex ?? 0);
+        // Apply if no local game, or incoming is from a later or equal turn
+        if (!cur || incomingTurn >= currentTurn) {
+          useMatchStore.setState({ game: incoming });
+          setSyncReady(true);
+        }
       }
     }, 1500);
 
@@ -843,7 +854,7 @@ export function GameBoard() {
     if (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) {
       // In online game, each device only controls its own seat
       const myOnlinePid = isOnlineGame && game
-        ? (game.players[myRoomSeat]?.id ?? null)
+        ? (game.players[myGameIdx]?.id ?? null)
         : null;
       const myPlayerId = myOnlinePid ?? cp.id;
       const t = setTimeout(() => {
@@ -1767,7 +1778,7 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
       {/* ── Portrait overlay — ask user to rotate ── */}
       {/* Online viewer mode: when it's NOT my turn, block all interaction */}
       {isOnlineGame && syncReady && game && (() => {
-        const myPlayer = game.players[myRoomSeat];
+        const myPlayer = game.players[myGameIdx];
         const isMyTurn = !isOnlineGame || (myPlayer && game.players[game.currentPlayerIndex]?.id === myPlayer.id);
         const phase    = game.phase;
         const myCity   = myPlayer && phase === 'turn-end'
