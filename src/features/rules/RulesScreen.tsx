@@ -108,7 +108,7 @@ export function RulesScreen() {
                 {block.heading as string}
               </h3>
             )}
-            {block.text && (
+            {block.text && !block.bullet && (
               <p style={{ margin: 0, color: '#EADBB7', lineHeight: 1.7, fontSize: '0.9rem' }}>
                 {block.text as string}
               </p>
