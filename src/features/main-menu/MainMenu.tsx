@@ -88,7 +88,7 @@ export function MainMenu() {
   const createGame = useGameStore((s) => s.createGame);
 
   const handleStart = () => { createGame(); navigate(ROUTES.create); };
-  const handleRules = () => { open(<RulesContent />, { title: 'قواعد اللعبة 📖', size: 'md' }); };
+  const handleRules = () => { navigate(ROUTES.rules); };
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden" dir="rtl">
@@ -332,78 +332,59 @@ export function MainMenu() {
           </div>
         </div>
 
-        {/* ── Buttons ── */}
-        <div className="w-full max-w-[310px] space-y-3">
+        {/* ── 2×2 Grid ── */}
+        <div style={{ width: '100%', maxWidth: 340, display: 'grid',
+          gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
-          {/* يلا بينا — PRIMARY */}
-          <button
-            onClick={handleStart}
-            className="group relative w-full overflow-hidden rounded-2xl py-4 font-bold transition-all active:scale-[0.98]"
-            style={{
-              background: 'linear-gradient(135deg, #E8C040 0%, #D4961A 50%, #E8C040 100%)',
-              backgroundSize: '200% 100%',
-              boxShadow: '0 4px 24px rgba(224,180,60,0.45), 0 1px 0 rgba(255,230,100,0.5) inset',
-              fontFamily: "'Cairo', sans-serif",
-              fontSize: '1.15rem',
+          {/* يلا بينا */}
+          <button onClick={handleStart}
+            style={{ borderRadius: 20, border: 'none', cursor: 'pointer', padding: '22px 10px',
+              background: 'linear-gradient(135deg, #E8C040 0%, #C49020 100%)',
+              boxShadow: '0 4px 20px rgba(224,180,60,0.4)',
+              fontFamily: "'Cairo', sans-serif", transition: 'transform 0.15s, box-shadow 0.15s',
             }}
-          >
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: 'linear-gradient(135deg, #F4CE5E 0%, #E0B43C 50%, #F4CE5E 100%)' }}/>
-            <span className="relative flex items-center justify-center gap-2 text-[#0E1726]">
-              <span className="text-xl">🎲</span>
-              <span>يلا بينا</span>
-            </span>
+            onMouseDown={(e) => (e.currentTarget.style.transform='scale(0.96)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform='scale(1)')}>
+            <div style={{ fontSize: '2rem', marginBottom: 6 }}>🎲</div>
+            <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0E1726' }}>يلا بينا</div>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(14,23,38,0.6)', marginTop: 2 }}>ابدأ لعبة</div>
           </button>
 
-          {/* الأصدقاء — Online Rooms */}
+          {/* الأصدقاء */}
           <button onClick={openRooms}
-            className="relative w-full overflow-hidden rounded-2xl border border-[rgba(56,74,110,0.5)] py-3.5 cursor-pointer hover:border-[rgba(224,180,60,0.4)] transition-colors"
-            style={{
-              background: 'rgba(14,23,38,0.7)',
-              fontFamily: "'Cairo', sans-serif",
-              fontSize: '1rem',
-              backdropFilter: 'blur(8px)',
+            style={{ borderRadius: 20, border: '1px solid rgba(78,130,255,0.35)', cursor: 'pointer',
+              padding: '22px 10px', background: 'rgba(22,34,58,0.9)',
+              fontFamily: "'Cairo', sans-serif", transition: 'transform 0.15s',
             }}
-          >
-            <span className="flex items-center justify-center gap-2 text-[#EADBB7]">
-              <span className="text-lg">👥</span>
-              <span>الأصدقاء</span>
-              <span className="ms-1 rounded-full bg-[rgba(56,74,110,0.8)] px-2 py-0.5 text-[9px] text-[#9AA6BC]">ً</span>
-            </span>
+            onMouseDown={(e) => (e.currentTarget.style.transform='scale(0.96)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform='scale(1)')}>
+            <div style={{ fontSize: '2rem', marginBottom: 6 }}>👥</div>
+            <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#90B8FF' }}>الأصدقاء</div>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(144,184,255,0.5)', marginTop: 2 }}>العب أونلاين</div>
           </button>
 
-          {/* قواعد اللعبة — ACTIVE */}
-          <button
-            onClick={handleRules}
-            className="group w-full overflow-hidden rounded-2xl border border-[rgba(56,74,110,0.8)] py-3.5 transition-all hover:border-[rgba(224,180,60,0.4)] active:scale-[0.98]"
-            style={{
-              background: 'rgba(22,34,58,0.85)',
-              fontFamily: "'Cairo', sans-serif",
-              fontSize: '1rem',
-              backdropFilter: 'blur(8px)',
+          {/* القواعد */}
+          <button onClick={handleRules}
+            style={{ borderRadius: 20, border: '1px solid rgba(110,231,183,0.3)', cursor: 'pointer',
+              padding: '22px 10px', background: 'rgba(22,34,58,0.9)',
+              fontFamily: "'Cairo', sans-serif", transition: 'transform 0.15s',
             }}
-          >
-            <span className="flex items-center justify-center gap-2 text-[#EADBB7] group-hover:text-[#F4CE5E] transition-colors">
-              <span className="text-lg">📖</span>
-              <span>قواعد اللعبة</span>
-            </span>
+            onMouseDown={(e) => (e.currentTarget.style.transform='scale(0.96)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform='scale(1)')}>
+            <div style={{ fontSize: '2rem', marginBottom: 6 }}>📖</div>
+            <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#6EE7B7' }}>القواعد</div>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(110,231,183,0.5)', marginTop: 2 }}>كيف تلعب</div>
           </button>
 
-          {/* المتجر — DISABLED */}
+          {/* المتجر */}
           <button disabled
-            className="relative w-full overflow-hidden rounded-2xl border border-[rgba(56,74,110,0.4)] py-3.5 opacity-45 cursor-not-allowed"
-            style={{
-              background: 'rgba(14,23,38,0.6)',
+            style={{ borderRadius: 20, border: '1px solid rgba(56,74,110,0.25)', cursor: 'not-allowed',
+              padding: '22px 10px', background: 'rgba(14,23,38,0.6)', opacity: 0.45,
               fontFamily: "'Cairo', sans-serif",
-              fontSize: '1rem',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <span className="flex items-center justify-center gap-2 text-[#EADBB7]">
-              <span className="text-lg">🛒</span>
-              <span>المتجر</span>
-              <span className="ms-1 rounded-full bg-[rgba(56,74,110,0.8)] px-2 py-0.5 text-[9px] text-[#9AA6BC]">قريباً</span>
-            </span>
+            }}>
+            <div style={{ fontSize: '2rem', marginBottom: 6 }}>🛒</div>
+            <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#9AA6BC' }}>المتجر</div>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(154,166,188,0.4)', marginTop: 2 }}>قريباً</div>
           </button>
         </div>
 

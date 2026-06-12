@@ -57,6 +57,13 @@ export const appRoutes: AppRoute[] = [
     ),
   },
   {
+    path: ROUTES.rules,
+    label: 'القواعد',
+    Component: lazy(() =>
+      import('@/features/rules/RulesScreen').then((m) => ({ default: m.RulesScreen })),
+    ),
+  },
+  {
     path: ROUTES.rooms,
     label: 'الأصدقاء',
     Component: lazy(() =>
