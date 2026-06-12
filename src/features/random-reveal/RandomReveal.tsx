@@ -112,7 +112,7 @@ export function RandomReveal() {
                   <span className="text-xs font-bold" style={{ color: POSITION_COLORS[i % POSITION_COLORS.length] }}>
                     #{i + 1}
                   </span>
-                  {i === 0 && <span className="text-[10px]" style={{ color: POSITION_COLORS[0] }}>أول</span>}
+
                 </div>
 
                 {/* Vehicle */}
@@ -128,7 +128,7 @@ export function RandomReveal() {
                     {p.name}
                   </p>
                   <p className="text-[10px]" style={{ color: POSITION_COLORS[i % POSITION_COLORS.length] }}>
-                    {i === 0 ? '🎯 يبدأ أول' : `بعد ${i} دور${i > 1 ? 'ات' : ''}`}
+                    {['هيلعب الاول','هيلعب التاني','هيلعب التالت','هيلعب الرابع'][i] ?? `هيلعب #${i+1}`}
                   </p>
                 </div>
 

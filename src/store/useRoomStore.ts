@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { VEHICLES } from '@/lib/vehicles';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Game } from '@/game/types';
 
@@ -80,13 +81,13 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
       await supabase.from('room_players').insert({
         room_id: room.id, user_id: userId, nickname,
-        color: '#E8C040', vehicle: '🚗', seat: 0, is_online: true, is_host: true,
+        color: '#E8C040', vehicle: VEHICLES[0].emoji, seat: 0, is_online: true, is_host: true,
       });
 
       const myRoom: Room = {
         id: room.id, code: room.code, hostId: userId, mode,
         status: 'waiting', gameState: null,
-        players: [{ userId, nickname, color: '#E8C040', vehicle: '🚗', seat: 0, isOnline: true, isHost: true, isBot: false }],
+        players: [{ userId, nickname, color: '#E8C040', vehicle: VEHICLES[0].emoji, seat: 0, isOnline: true, isHost: true, isBot: false }],
       };
       set({ room: myRoom, myUserId: userId, loading: false });
       return null;
@@ -125,7 +126,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         color: colors[seat], vehicle: vehicles[seat], seat, is_online: true, is_host: false,
       });
 
-      const newPlayer: RoomPlayer = { userId, nickname, color: colors[seat], vehicle: vehicles[seat], seat, isOnline: true, isHost: false, isBot: false };
+      const newPlayer: RoomPlayer = { userId, nickname, color: colors[seat], vehicle: vehicles[seat % vehicles.length], seat, isOnline: true, isHost: false, isBot: false };
       const allPlayers = [...existingPlayers, newPlayer];
       set({ room: { id: room.id, code: room.code, hostId: room.host_id, mode: room.mode,
         status: room.status, gameState: room.game_state, players: allPlayers }, myUserId: userId, loading: false });
@@ -293,7 +294,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     const BOT_NAMES = ['الروبوت','سكاي نت','هال 9000','ذكاء','بوت ماكس','برو بوت'];
     const seat = room.players.length;
     const colors = ['#E8C040','#4FC3F7','#81C784','#FF8A65'];
-    const vehicles = ['🚗','🏎️','🚕','🚙'];
+    const vehicles = VEHICLES.map((v) => v.emoji);
     const botId = `bot_${Date.now()}`;
     const botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
     await supabase.from('room_players').insert({
@@ -301,7 +302,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       color: colors[seat], vehicle: vehicles[seat], seat, is_online: true, is_host: false, is_bot: true,
     });
     const newBot: RoomPlayer = { userId: botId, nickname: botName, color: colors[seat],
-      vehicle: vehicles[seat], seat, isOnline: true, isHost: false, isBot: true };
+      vehicle: vehicles[seat % vehicles.length], seat, isOnline: true, isHost: false, isBot: true };
     set({ room: { ...room, players: [...room.players, newBot] } });
   },
 

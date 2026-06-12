@@ -111,33 +111,43 @@ export function GameBoard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lateGame]);
 
+  // ── Online: which game player am I? ─────────────────────────────────────
+  const isOnlineHost = isOnlineGame && room?.hostId === myUserId;
+  const [syncReady, setSyncReady] = useState(() => !isOnlineGame || (!!room && room.hostId === myUserId));
+
+  // My seat in the room → maps to game player index
+  const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0;
+
   // ── Online room subscription ──────────────────────────────────────────────
   useEffect(() => {
     if (!isOnlineGame) return;
     subscribe(
-      (event, payload) => {
-        // Animation hints (future: dice sync, movement preview)
-        console.log('[room event]', event, payload);
-      },
+      (_event, _payload) => {},
       (incomingGame) => {
-        // Another player pushed state — update local store
-        useMatchStore.setState((s) => ({ game: incomingGame }));
+        // Received game state from active player → apply it
+        useMatchStore.setState({ game: incomingGame });
+        setSyncReady(true);
       },
       (players) => {
-        // Player online status changed
         players.forEach((p) => {
-          if (!p.isOnline) {
-            // Mark their game player as bot after 10s (handled in useRoomStore)
-            markDisconnected(p.userId);
-          } else {
-            markReconnected(p.userId);
-          }
+          if (!p.isOnline) markDisconnected(p.userId);
+          else markReconnected(p.userId);
         });
       }
     );
     return () => unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineGame]);
+
+  // ── Host: push initial game state so non-hosts can sync ──────────────────
+  useEffect(() => {
+    if (!isOnlineHost) return;
+    const g = useMatchStore.getState().game;
+    if (!g) return;
+    // Push initial state; non-hosts will receive it and unsee loading screen
+    pushGameState(g);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineHost]);
 
   // ── Portrait detection ────────────────────────────────────────────────────
   const [isPortrait, setIsPortrait] = useState(
@@ -793,7 +803,11 @@ export function GameBoard() {
     if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
 
     if (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) {
-      const myPlayerId = cp.id;
+      // In online game, each device only controls its own seat
+      const myOnlinePid = isOnlineGame && game
+        ? (game.players[myRoomSeat]?.id ?? null)
+        : null;
+      const myPlayerId = myOnlinePid ?? cp.id;
       const t = setTimeout(() => {
         const g2 = useMatchStore.getState().game;
         if (g2?.players[g2.currentPlayerIndex]?.id === myPlayerId) handleRoll();
@@ -1716,6 +1730,25 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
   return (
     <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* ── Portrait overlay — ask user to rotate ── */}
+      {/* Online sync loading overlay for non-host */}
+      {isOnlineGame && !syncReady && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99998,
+          background: '#0E1726',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16,
+          fontFamily: "'Cairo', sans-serif",
+        }}>
+          <div style={{ fontSize: 48 }}>🎲</div>
+          <h2 style={{ color: '#E0B43C', fontWeight: 900, fontSize: '1.3rem', margin: 0 }}>
+            جاري تحميل اللعبة...
+          </h2>
+          <p style={{ color: '#9AA6BC', fontSize: '0.85rem', margin: 0 }}>
+            في انتظار الهوست يبدأ
+          </p>
+        </div>
+      )}
+
       {isPortrait && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 99999,
