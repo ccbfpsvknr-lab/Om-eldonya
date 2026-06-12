@@ -9,6 +9,7 @@ import {
   selectGame, selectCurrentPlayer, SALFA_AMOUNT,
 } from '@/store';
 import { useRoomStore } from '@/store/useRoomStore';
+import { supabase } from '@/lib/supabase';
 import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL, totalUpgradeInvestment } from '@/game/engine/upgradeEngine';
 import { getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
 import { getCard } from '@/game/data/chanceCards';
@@ -125,60 +126,39 @@ export function GameBoard() {
     buy:     (id: string) => void;
   }>({ roll: () => {}, endTurn: () => {}, buy: () => {} });
 
-  // ── Online room subscription ──────────────────────────────────────────────
+  // ── Online sync: simple polling (1.5s) — reliable on all devices ─────────────
   useEffect(() => {
-    if (!isOnlineGame) return;
-    subscribe(
-      (event, payload) => {
-        // Host: process action requests from non-host players
-        if (event === 'player_action' && isOnlineHost) {
-          const g = useMatchStore.getState().game;
-          if (!g) return;
-          const seat = (payload as Record<string, unknown>)?.seat as number;
-          const activePid = g.players[g.currentPlayerIndex]?.id;
-          if (g.players[seat]?.id !== activePid) return;
-          const action = (payload as Record<string, unknown>)?.action as string;
-          if (action === 'roll')     actionRef.current.roll();
-          if (action === 'end_turn') actionRef.current.endTurn();
-          if (action === 'buy')      actionRef.current.buy((payload as Record<string, unknown>).cityId as string);
+    if (!room) return;
+
+    // Poll game state when it's NOT my turn (or when waiting for initial state)
+    const poll = setInterval(async () => {
+      const g = useMatchStore.getState().game;
+      const myPlayer = g?.players[myRoomSeat];
+      const isMyTurn = myPlayer && g && g.players[g.currentPlayerIndex]?.id === myPlayer.id;
+      const isMyBotTurn = isOnlineHost && g?.players[g?.currentPlayerIndex ?? -1]?.isBot;
+
+      // Only skip poll when it's actively my turn (or my bot's turn as host)
+      if (isMyTurn || isMyBotTurn) return;
+
+      const { data } = await supabase.from('rooms').select('game_state').eq('id', room.id).single();
+      if (data?.game_state) {
+        const incoming = data.game_state as typeof g;
+        if (!incoming) return;
+        // Only apply if it's a newer state (different player turn or phase)
+        const cur = useMatchStore.getState().game;
+        if (!cur || incoming.currentPlayerIndex !== cur.currentPlayerIndex
+            || incoming.phase !== cur.phase || !isMyTurn) {
+          useMatchStore.setState({ game: incoming });
+          setSyncReady(true);
         }
-      },
-      (incomingGame) => {
-        // Non-host: received game state from host → apply it
-        useMatchStore.setState({ game: incomingGame });
-        setSyncReady(true);
-      },
-      (players) => {
-        players.forEach((p) => {
-          if (!p.isOnline) markDisconnected(p.userId);
-          else markReconnected(p.userId);
-        });
       }
-    );
-    return () => unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnlineGame]);
+    }, 1500);
 
-  // ── Host authority: push state on every significant game change ────────────
-  useEffect(() => {
-    if (!isOnlineHost || !game) return;
-    // Push on phase change or player change (covers all turn transitions)
-    pushGameState(game);
+    return () => clearInterval(poll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.phase, game?.currentPlayerIndex, isOnlineHost]);
+  }, [room?.id, myRoomSeat, isOnlineHost]);
 
-  // ── Host: push initial state (+ retries for late-joining non-hosts) ─────────
-  useEffect(() => {
-    if (!isOnlineHost) return;
-    const push = () => { const g = useMatchStore.getState().game; if (g) pushGameState(g); };
-    push();
-    const t1 = setTimeout(push, 1500);
-    const t2 = setTimeout(push, 4000);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnlineHost]);
-
-  // Host action requests are handled via onEvent in the subscribe() call below
+  // Online sync handled below via polling
 
   // ── Portrait detection ────────────────────────────────────────────────────
   const [isPortrait, setIsPortrait] = useState(
@@ -851,6 +831,7 @@ export function GameBoard() {
   // ── Bot automation ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
+    if (isOnlineGame && !isOnlineHost) return; // only host runs bots in online games
 
     if (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) {
       // In online game, each device only controls its own seat
