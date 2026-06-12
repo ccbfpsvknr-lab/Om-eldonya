@@ -12,7 +12,8 @@ export function PlayerSetup() {
   const navigate    = useNavigate();
   const { confirm } = useModal();
   const players     = usePlayersStore((s) => s.players);
-  const addPlayer   = usePlayersStore((s) => s.addPlayer);
+  const addPlayer      = usePlayersStore((s) => s.addPlayer);
+  const changeVehicle  = usePlayersStore((s) => s.changeVehicle);
   const removePlayer = usePlayersStore((s) => s.removePlayer);
   const toggleBot    = usePlayersStore((s) => s.toggleBot);
   const canStart    = usePlayersStore(selectCanStart);
@@ -38,6 +39,7 @@ export function PlayerSetup() {
   const firstAvailable  = availableVehicles[0]?.emoji ?? VEHICLES[0].emoji;
   const [name, setName] = useState('');
   const [vehicle, setVehicle] = useState<string>(firstAvailable);
+  const [pickingFor, setPickingFor] = useState<string | null>(null); // player id
   const full = players.length >= maxPlayers;
 
   const submit = (e: FormEvent) => {
@@ -166,20 +168,25 @@ export function PlayerSetup() {
         ) : (
           <div className="space-y-2">
             {players.map((p, idx) => (
-              <div key={p.id}
-                className="flex items-center gap-3 rounded-2xl overflow-hidden animate-scale-in"
-                style={{
-                  background: p.isBot ? 'rgba(30,20,50,0.85)' : 'rgba(14,23,38,0.85)',
-                  border: p.isBot ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(56,74,110,0.5)',
-                }}>
+              <div key={p.id} className="rounded-2xl overflow-hidden animate-scale-in"
+                style={{ background: p.isBot ? 'rgba(30,20,50,0.85)' : 'rgba(14,23,38,0.85)',
+                  border: p.isBot ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(56,74,110,0.5)' }}>
+              <div className="flex items-center gap-3">
                 {/* Color stripe */}
                 <div className="w-1 self-stretch" style={{ background: p.color }}/>
 
-                {/* Vehicle */}
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl text-2xl"
-                  style={{ background: `${p.color}22`, border: `1px solid ${p.color}44` }}>
+                {/* Vehicle — tap to change */}
+                <button
+                  onClick={() => setPickingFor(pickingFor === p.id ? null : p.id)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-2xl relative transition-all active:scale-90"
+                  style={{ background: `${p.color}22`, border: `1px solid ${p.color}44` }}
+                  title="تغيير العربية">
                   {p.vehicle}
-                </div>
+                  <span style={{ position: 'absolute', bottom: '-4px', right: '-4px',
+                    fontSize: '8px', background: 'rgba(14,23,38,0.9)', borderRadius: '4px', padding: '1px 2px' }}>
+                    ✏️
+                  </span>
+                </button>
 
                 {/* Name + info */}
                 <div className="flex-1 min-w-0">
@@ -218,6 +225,39 @@ export function PlayerSetup() {
                   className="mr-3 flex h-7 w-7 items-center justify-center rounded-lg text-[#9AA6BC] hover:text-[#E05656] transition-colors text-sm">
                   ✕
                 </button>
+              </div>
+
+              {/* Vehicle picker — expands when tapping the vehicle */}
+              {pickingFor === p.id && (
+                <div style={{ padding: '8px 12px 10px', borderTop: '1px solid rgba(56,74,110,0.3)',
+                  background: 'rgba(10,18,35,0.9)' }}>
+                  <p style={{ fontFamily: "'Cairo'", fontSize: '0.72rem', color: '#9AA6BC', marginBottom: 8 }}>
+                    اختر عربيتك 🚗
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+                    {VEHICLES.map((v) => {
+                      const takenByOther = players.some((o) => o.id !== p.id && o.vehicle === v.emoji);
+                      const isSelected   = p.vehicle === v.emoji;
+                      return (
+                        <button key={v.emoji}
+                          disabled={takenByOther}
+                          onClick={() => { changeVehicle(p.id, v.emoji); setPickingFor(null); }}
+                          style={{
+                            padding: '8px 0', borderRadius: 8, border: 'none', fontSize: '1.4rem',
+                            background: isSelected ? `${p.color}33` : 'rgba(22,34,58,0.8)',
+                            outline: isSelected ? `2px solid ${p.color}` : 'none',
+                            opacity: takenByOther ? 0.25 : 1,
+                            cursor: takenByOther ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                          title={v.name}>
+                          {v.emoji}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               </div>
             ))}
           </div>

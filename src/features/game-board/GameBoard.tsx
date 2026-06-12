@@ -160,6 +160,14 @@ export function GameBoard() {
 
   // Online sync handled below via polling
 
+  // ── Host: write initial game state to DB so non-hosts can start polling ───
+  useEffect(() => {
+    if (!isOnlineHost || !game) return;
+    // Write immediately when board loads (not waiting for first endTurn)
+    supabase.from('rooms').update({ game_state: game }).eq('id', room!.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineHost]);  // only runs once when host's board mounts
+
   // ── Portrait detection ────────────────────────────────────────────────────
   const [isPortrait, setIsPortrait] = useState(
     () => window.innerHeight > window.innerWidth
@@ -730,7 +738,7 @@ export function GameBoard() {
               <p className="text-xl font-extrabold text-gold mt-1">+{salary.toLocaleString('en-US')} جنيه</p>
             </div>
           );
-          if (onDone) { onDone(); setIsMoving(false); } else { resolveLanding(); setIsMoving(false); }
+          if (onDone) { onDone(); setIsMoving(false); } else { resolveLanding(); setIsMoving(false); syncOnline(); }
         }, 150);
       }
     }, 350);
@@ -1782,9 +1790,9 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
               دورك! 🎲
             </div>
             <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 360 }}>
+              {/* Non-host runs game locally on their turn, then syncOnline writes to DB */}
               {phase === 'rolling' && (
-                <button
-                  onClick={() => broadcastAction('player_action', { action: 'roll', seat: myRoomSeat })}
+                <button onClick={handleRoll}
                   style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none',
                     background: 'linear-gradient(135deg, #E8C040, #C49020)',
                     color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
@@ -1794,14 +1802,13 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
               {phase === 'turn-end' && canBuy && (
                 <>
                   <button
-                    onClick={() => broadcastAction('player_action', { action: 'buy', seat: myRoomSeat, cityId: myCity?.cityId })}
+                    onClick={() => { if (myCity?.cityId) { buyCity(myCity.cityId); syncOnline(); } }}
                     style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none',
                       background: 'linear-gradient(135deg, #E8C040, #C49020)',
                       color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
                     🏙️ اشتري ({landedCity?.price?.toLocaleString()})
                   </button>
-                  <button
-                    onClick={() => broadcastAction('player_action', { action: 'end_turn', seat: myRoomSeat })}
+                  <button onClick={handleEndTurn}
                     style={{ flex: 1, padding: '14px', borderRadius: 14,
                       background: 'rgba(154,166,188,0.12)', border: '1px solid rgba(154,166,188,0.3)',
                       color: '#9AA6BC', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer' }}>
@@ -1810,8 +1817,7 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
                 </>
               )}
               {phase === 'turn-end' && !canBuy && (
-                <button
-                  onClick={() => broadcastAction('player_action', { action: 'end_turn', seat: myRoomSeat })}
+                <button onClick={handleEndTurn}
                   style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none',
                     background: 'linear-gradient(135deg, #E8C040, #C49020)',
                     color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>

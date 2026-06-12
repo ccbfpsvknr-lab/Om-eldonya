@@ -302,7 +302,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     const { room } = get();
     if (!room || room.players.length >= 4) return;
     const BOT_NAMES = ['الروبوت','سكاي نت','هال 9000','ذكاء','بوت ماكس','برو بوت'];
-    const seat = room.players.length;
+    const allSeats = [0, 1, 2, 3];
+    const seat = allSeats.find((s) => !room.players.some((p) => p.seat === s)) ?? room.players.length;
     const colors = ['#E8C040','#4FC3F7','#81C784','#FF8A65'];
     const vehicles = VEHICLES.map((v) => v.emoji);
     const botId = `bot_${Date.now()}`;

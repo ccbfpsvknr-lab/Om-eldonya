@@ -11,7 +11,8 @@ interface PlayersState {
   renamePlayer: (id: string, name: string) => void;
   setHost: (id: string) => void;
   resetPlayers: () => void;
-  toggleBot: (id: string) => void;
+  toggleBot:     (id: string) => void;
+  changeVehicle: (id: string, vehicle: string) => void;
 }
 
 function nextColor(index: number): string {
@@ -59,6 +60,9 @@ export const usePlayersStore = create<PlayersState>((set) => ({
     set((state) => ({
       players: state.players.map((p) => ({ ...p, isHost: p.id === id })),
     })),
+
+  changeVehicle: (id, vehicle) =>
+    set((s) => ({ players: s.players.map((p) => p.id === id ? { ...p, vehicle } : p) })),
 
   toggleBot: (id) =>
     set((state) => ({

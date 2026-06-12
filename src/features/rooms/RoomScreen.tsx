@@ -51,12 +51,20 @@ export function RoomScreen() {
   const userId   = profile?.id ?? '';
   const nickname = profile?.nickname ?? 'ضيف';
 
-  // ── POLL for game start (non-host) — reliable backup for broadcast race conditions ──
+  // ── POLL for lobby updates (bots) + game start detection ──────────────────
   useEffect(() => {
     if (!room || room.hostId === userId || room.status === 'playing') return;
     const poll = setInterval(async () => {
       const { data } = await supabase.from('rooms')
         .select('status, game_state, mode').eq('id', room.id).single();
+
+      // Update lobby players (host may have added/removed bots)
+      if (data?.game_state?.isLobby && data.game_state.lobbyPlayers) {
+        useRoomStore.setState((s) => ({
+          room: s.room ? { ...s.room, players: data.game_state.lobbyPlayers, mode: data.mode } : null
+        }));
+      }
+
       if (data?.status === 'playing' && data?.game_state?.players) {
         clearInterval(poll);
         const players: RoomPlayer[] = data.game_state.players;
@@ -227,7 +235,7 @@ export function RoomScreen() {
           <div style={{ ...S.card, marginBottom: 14 }}>
             <p style={{ ...S.label, marginBottom: 12 }}>اللاعبين</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {Array.from({ length: 4 }, (_, i) => {
+              {Array.from({ length: room.mode === 'quick' ? 3 : 4 }, (_, i) => {
                 const p: RoomPlayer | undefined = room.players.find((pl) => pl.seat === i);
                 return (
                   <div key={i} style={{
