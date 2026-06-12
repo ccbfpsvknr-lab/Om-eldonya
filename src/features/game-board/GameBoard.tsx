@@ -118,13 +118,33 @@ export function GameBoard() {
   // My seat in the room → maps to game player index
   const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0;
 
+  // Refs for action handlers — avoids stale closures in the subscribe callback
+  const actionRef = useRef<{
+    roll:    () => void;
+    endTurn: () => void;
+    buy:     (id: string) => void;
+  }>({ roll: () => {}, endTurn: () => {}, buy: () => {} });
+
   // ── Online room subscription ──────────────────────────────────────────────
   useEffect(() => {
     if (!isOnlineGame) return;
     subscribe(
-      (_event, _payload) => {},
+      (event, payload) => {
+        // Host: process action requests from non-host players
+        if (event === 'player_action' && isOnlineHost) {
+          const g = useMatchStore.getState().game;
+          if (!g) return;
+          const seat = (payload as Record<string, unknown>)?.seat as number;
+          const activePid = g.players[g.currentPlayerIndex]?.id;
+          if (g.players[seat]?.id !== activePid) return;
+          const action = (payload as Record<string, unknown>)?.action as string;
+          if (action === 'roll')     actionRef.current.roll();
+          if (action === 'end_turn') actionRef.current.endTurn();
+          if (action === 'buy')      actionRef.current.buy((payload as Record<string, unknown>).cityId as string);
+        }
+      },
       (incomingGame) => {
-        // Received game state from active player → apply it
+        // Non-host: received game state from host → apply it
         useMatchStore.setState({ game: incomingGame });
         setSyncReady(true);
       },
@@ -158,36 +178,7 @@ export function GameBoard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineHost]);
 
-  // ── Host: handle action requests from non-host players ───────────────────────
-  useEffect(() => {
-    if (!isOnlineHost) return;
-    const { room: r } = useRoomStore.getState();
-    if (!r) return;
-
-    const unsubRoom = useRoomStore.subscribe(
-      (state) => state.channel,
-      (ch) => {
-        if (!ch) return;
-        ch.on('broadcast', { event: 'player_action' }, ({ payload }) => {
-          const g = useMatchStore.getState().game;
-          if (!g) return;
-          const activePid = g.players[g.currentPlayerIndex]?.id;
-          // Only process if it's actually that player's turn
-          const senderSeat = payload?.seat as number;
-          const senderPlayer = g.players[senderSeat];
-          if (!senderPlayer || senderPlayer.id !== activePid) return;
-
-          const action = payload?.action as string;
-          if (action === 'roll')        handleRoll();
-          if (action === 'end_turn')    handleEndTurn();
-          if (action === 'buy' && payload?.cityId)   buyCity(payload.cityId as string);
-          if (action === 'skip')        { /* handled by closing modal */ }
-        });
-      }
-    );
-    return () => unsubRoom();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnlineHost]);
+  // Host action requests are handled via onEvent in the subscribe() call below
 
   // ── Portrait detection ────────────────────────────────────────────────────
   const [isPortrait, setIsPortrait] = useState(
@@ -327,7 +318,8 @@ export function GameBoard() {
   };
 
   // Online non-host: no local game yet — show loading until host pushes state
-  if ((!game || !cp) && isOnlineGame && !isOnlineHost) return (
+  // Use room presence directly (don't depend on room.status which might lag)
+  if ((!game || !cp) && room && room.hostId !== myUserId) return (
     <div style={{
       position: 'fixed', inset: 0, background: '#0E1726',
       display: 'flex', flexDirection: 'column',
@@ -882,8 +874,8 @@ export function GameBoard() {
         const cur = g2?.players[g2?.currentPlayerIndex ?? -1];
         // Only act if it's still THIS bot's turn
         if (!g2 || !cur?.isBot || cur.id !== myPlayerId) return;
-        // Upgrade: own full region, can afford, hasn't upgraded yet
-        if (!g2.hasUpgradedThisTurn) {
+        // Upgrade: own full region, can afford, hasn't upgraded yet (not in fast mode)
+        if (!g2.hasUpgradedThisTurn && g2.mode !== 'quick') {
           const cities = Object.values(g2.cities);
           for (const city of cities) {
             if (city.ownerId !== cur.id) continue;
@@ -1201,18 +1193,15 @@ export function GameBoard() {
                     </div>
                   )}
 
-                  {/* Tile index */}
-                  <div style={{ position: 'absolute', top: 0, right: 1, fontSize: '4px',
-                    color: 'rgba(154,166,188,0.3)', fontFamily: 'monospace', lineHeight: 1, zIndex: 5 }}>
-                    {tile.index}
-                  </div>
-
-                  {/* Smoke */}
-                  {hasSmoke && (
-                    <div className="animate-smoke-out" style={{ position: 'absolute', inset: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '22px', pointerEvents: 'none', zIndex: 25 }}>💨</div>
-                  )}
+                  {/* Smoke — at tile edge toward next tile */}
+                  {hasSmoke && (() => {
+                    const ss: React.CSSProperties = { position: 'absolute', fontSize: '14px', pointerEvents: 'none', zIndex: 25 };
+                    if (edge === 'bottom') { ss.left = '50%'; ss.top = '-8px'; ss.transform = 'translateX(-50%)'; }
+                    else if (edge === 'right')  { ss.top = '50%'; ss.left = '-8px'; ss.transform = 'translateY(-50%)'; }
+                    else if (edge === 'top')    { ss.left = '50%'; ss.bottom = '-8px'; ss.transform = 'translateX(-50%)'; }
+                    else                        { ss.top = '50%'; ss.right = '-8px'; ss.transform = 'translateY(-50%)'; }
+                    return <div className="animate-smoke-out" style={ss}>💨</div>;
+                  })()}
                 </div>
               );
             })}
@@ -1276,7 +1265,7 @@ export function GameBoard() {
                           {cp.name}
                         </div>
                         <div style={{ fontSize: isFastBoard ? '9px' : '6px', color: '#9AA6BC', lineHeight: 1 }}>
-                          {isInJail ? '🔒 في الحجز' : `خانة ${cpVisualPos}`}
+                          {isInJail ? '🔒 في الحجز' : ''}
                         </div>
                       </div>
                       <div style={{ fontSize: isFastBoard ? '13px' : '8px', fontWeight: 800, color: cp.cash < 0 ? '#E05656' : '#E0B43C', fontFamily: 'monospace', lineHeight: 1 }}>
