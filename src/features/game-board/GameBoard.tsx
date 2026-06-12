@@ -9,7 +9,6 @@ import {
   selectGame, selectCurrentPlayer, SALFA_AMOUNT,
 } from '@/store';
 import { useRoomStore } from '@/store/useRoomStore';
-import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import { canUpgrade, getUpgradeCost, MAX_UPGRADE_LEVEL, totalUpgradeInvestment } from '@/game/engine/upgradeEngine';
 import { getCityRent, isRegionComplete } from '@/game/engine/economyEngine';
@@ -97,7 +96,6 @@ const cashEmoji = (n: number): string =>
 export function GameBoard() {
   const navigate    = useNavigate();
   const { room, myUserId, pushGameState, subscribe, unsubscribe, markDisconnected, markReconnected, broadcastAction } = useRoomStore();
-  const profile = useAuthStore((s) => s.profile);
   const isOnlineGame = !!room && room.status === 'playing';
   const { confirm, open, close } = useModal();
 
@@ -122,8 +120,8 @@ export function GameBoard() {
     return !!useMatchStore.getState().game;    // non-host — ready if game already loaded
   });
 
-  // Find my player in the game by nickname — works correctly regardless of shuffle order
-  const myNickname  = profile?.nickname ?? '';
+  // Find nickname from room players (avoids useAuthStore circular import)
+  const myNickname  = room?.players.find((p) => p.userId === myUserId)?.nickname ?? '';
   const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0; // kept for room checks only
   // Use this everywhere instead of myRoomSeat for game logic:
   const myGameIdx   = game ? game.players.findIndex((p) => p.name === myNickname) : -1;

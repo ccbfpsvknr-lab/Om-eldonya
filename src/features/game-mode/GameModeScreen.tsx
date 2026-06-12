@@ -15,7 +15,7 @@ const BOT_COUNTS = [1, 2, 3];
 export function GameModeScreen() {
   const navigate    = useNavigate();
   const { profile } = useAuthStore();
-  const [tab, setTab]         = useState<Tab>('bots');
+  const [tab, setTab]         = useState<Tab | null>(null);
   const [mode, setMode]       = useState<Mode>('quick');
   const [botCount, setBotCount] = useState(1);
 
@@ -109,7 +109,7 @@ export function GameModeScreen() {
       {/* Mode tabs */}
       <div style={{ padding: '14px 16px 0', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto' }}>
         {TABS.map((t) => (
-          <div key={t.id} onClick={() => !t.locked && setTab(t.id)}
+          <div key={t.id} onClick={() => !t.locked && setTab(tab === t.id ? null : t.id)}
             style={{ ...card(tab === t.id, t.accent), opacity: t.locked ? 0.5 : 1,
               cursor: t.locked ? 'not-allowed' : 'pointer' }}>
             {/* Card header */}
@@ -142,7 +142,7 @@ export function GameModeScreen() {
                   <div style={{ marginBottom: 12 }}>
                     <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: '#9AA6BC' }}>عدد البوتات</p>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      {BOT_COUNTS.map((n) => (
+                      {BOT_COUNTS.filter((n) => n <= maxBots).map((n) => (
                         <button key={n} onClick={(e) => { e.stopPropagation(); setBotCount(n); }}
                           style={{ ...modeBtn(botCount === n, t.accent), padding: '9px 0' }}>
                           {n} 🤖
@@ -156,7 +156,8 @@ export function GameModeScreen() {
                 <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: '#9AA6BC' }}>نوع اللعبة</p>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                   <button onClick={(e) => { e.stopPropagation(); setMode('quick'); }}
-                    style={modeBtn(mode === 'quick', t.accent)}>
+                    style={modeBtn(mode === 'quick', t.accent)}
+                    onClick={(e) => { e.stopPropagation(); setMode('quick'); if (botCount > 2) setBotCount(2); }}>
                     ⚡ سريعة
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); setMode('classic'); }}
