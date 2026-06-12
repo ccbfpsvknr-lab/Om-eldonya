@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRoomStore, type RoomPlayer } from '@/store/useRoomStore';
 import { usePlayersStore, useGameStore } from '@/store';
 import { supabase } from '@/lib/supabase';
+import { shuffle } from '@/lib/shuffle';
 import { VEHICLES } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ROUTES } from '@/lib/constants';
@@ -58,29 +59,36 @@ export function RoomScreen() {
       const { data } = await supabase.from('rooms')
         .select('status, game_state, mode').eq('id', room.id).single();
 
-      // Update lobby players (host may have added/removed bots)
+      // Update lobby bots visibility
       if (data?.game_state?.isLobby && data.game_state.lobbyPlayers) {
         useRoomStore.setState((s) => ({
           room: s.room ? { ...s.room, players: data.game_state.lobbyPlayers, mode: data.mode } : null
         }));
       }
 
-      if (data?.status === 'playing' && data?.game_state?.players) {
+      // Host moved to reveal — set up players with same shuffled order and go to reveal
+      if ((data?.status === 'revealing') && data?.game_state?.preGame && data.game_state.playerOrder) {
         clearInterval(poll);
-        const players: RoomPlayer[] = data.game_state.players;
+        const ordered: RoomPlayer[] = data.game_state.playerOrder;
         const mode: 'quick' | 'classic' = data.game_state.mode ?? room.mode;
         const ps = usePlayersStore.getState();
         ps.resetPlayers();
-        players.forEach((p: RoomPlayer) => ps.addPlayer(p.nickname, p.vehicle));
-        const currentP = usePlayersStore.getState().players;
-        players.forEach((p: RoomPlayer, i: number) => {
-          if (p.isBot && currentP[i]) ps.toggleBot(currentP[i].id);
-        });
+        ordered.forEach((p: RoomPlayer) => ps.addPlayer(p.nickname, p.vehicle));
+        const cp3 = ps.players;
+        ordered.forEach((p: RoomPlayer, i: number) => { if (p.isBot && cp3[i]) ps.toggleBot(cp3[i].id); });
         useGameStore.getState().setMode(mode);
-        // Critical: mark room as playing in store BEFORE navigating
-        // so GameBoard's isOnlineGame check evaluates to true
         useRoomStore.setState((s) => ({
-          room: s.room ? { ...s.room, status: 'playing', mode } : null,
+          room: s.room ? { ...s.room, status: 'revealing' } : null,
+        }));
+        navigate(ROUTES.reveal);
+      }
+
+      // Host started game — navigate to board directly
+      if (data?.status === 'playing' && data?.game_state?.board) {
+        clearInterval(poll);
+        useMatchStore.setState({ game: data.game_state });
+        useRoomStore.setState((s) => ({
+          room: s.room ? { ...s.room, status: 'playing' } : null,
         }));
         navigate(ROUTES.board);
       }
@@ -146,34 +154,24 @@ export function RoomScreen() {
   const handleStart = async () => {
     if (!room) return;
     try {
-      // Set up local player store from room roster
+      // Shuffle players ONCE here — same order for everyone
+      const shuffled = shuffle([...room.players]);
+      // Set up local stores
       resetPlayers();
-      room.players.forEach((p) => { addPlayer(p.nickname, p.vehicle); });
-      // Mark bots by ID — get current players after adding them
-      const currentPlayers = usePlayersStore.getState().players;
-      room.players.forEach((p, i) => {
-        if (p.isBot && currentPlayers[i]) {
-          toggleBot(currentPlayers[i].id);
-        }
+      shuffled.forEach((p: RoomPlayer) => addPlayer(p.nickname, p.vehicle));
+      const cp2 = usePlayersStore.getState().players;
+      shuffled.forEach((p: RoomPlayer, i: number) => {
+        if (p.isBot && cp2[i]) toggleBot(cp2[i].id);
       });
-      // Set game mode
       setGameMode(room.mode);
-      // Update room status in DB
+      // Write to DB: status='revealing' + shuffled order (so non-host can see reveal too)
       await supabase.from('rooms').update({
-        status: 'playing',
-        game_state: { players: room.players, mode: room.mode },
+        status: 'revealing',
+        game_state: { preGame: true, playerOrder: shuffled, mode: room.mode },
       }).eq('id', room.id);
       useRoomStore.setState((s) => ({
-        room: s.room ? { ...s.room, status: 'playing' } : null,
+        room: s.room ? { ...s.room, status: 'revealing' } : null,
       }));
-      // Broadcast "game_start" so all non-host players also navigate
-      const ch = useRoomStore.getState().channel;
-      if (ch) {
-        ch.send({
-          type: 'broadcast', event: 'game_start',
-          payload: { players: room.players, mode: room.mode },
-        });
-      }
       navigate(ROUTES.reveal);
     } catch (e) {
       showMsg(String(e), true);

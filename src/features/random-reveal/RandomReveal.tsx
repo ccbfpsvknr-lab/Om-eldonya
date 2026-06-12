@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayersStore, useGameStore, useMatchStore } from '@/store';
+import { useRoomStore } from '@/store/useRoomStore';
+import { supabase } from '@/lib/supabase';
+import { useEffect } from 'react';
 import { ROUTES } from '@/lib/constants';
 import { shuffle } from '@/lib/shuffle';
 
@@ -22,9 +25,43 @@ export function RandomReveal() {
 
   const order = useMemo(() => shuffle(players), [players]);
 
+  const room        = useRoomStore((s) => s.room);
+  const myUserId    = useRoomStore((s) => s.myUserId);
+  const isOnlineGame = !!room;
+  const isOnlineHost = isOnlineGame && room?.hostId === myUserId;
+
+  // Non-host: poll for game state — auto-navigate when host starts
+  useEffect(() => {
+    if (!isOnlineGame || isOnlineHost) return;
+    const poll = setInterval(async () => {
+      const { data } = await supabase.from('rooms')
+        .select('game_state, status').eq('id', room!.id).single();
+      if (data?.status === 'playing' && data?.game_state?.board) {
+        clearInterval(poll);
+        useMatchStore.setState({ game: data.game_state });
+        useRoomStore.setState((s) => ({
+          room: s.room ? { ...s.room, status: 'playing' } : null,
+        }));
+        navigate(ROUTES.board);
+      }
+    }, 1500);
+    return () => clearInterval(poll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineGame, isOnlineHost]);
+
   const proceed = () => {
     createMatch({ mode, players: order });
     setPhase('playing');
+    // Write game state to Supabase for non-host to receive
+    if (isOnlineHost && room) {
+      const game = useMatchStore.getState().game;
+      if (game) {
+        supabase.from('rooms').update({ status: 'playing', game_state: game }).eq('id', room.id);
+        useRoomStore.setState((s) => ({
+          room: s.room ? { ...s.room, status: 'playing' } : null,
+        }));
+      }
+    }
     navigate(ROUTES.board);
   };
 
@@ -143,7 +180,8 @@ export function RandomReveal() {
 
       {/* Footer */}
       <div className="relative z-10 px-4 pt-3 pb-4 flex-shrink-0">
-        <button onClick={proceed} disabled={order.length === 0}
+        <button onClick={isOnlineGame && !isOnlineHost ? undefined : proceed}
+          disabled={isOnlineGame && !isOnlineHost} disabled={order.length === 0}
           className="w-full rounded-2xl py-4 font-bold transition-all active:scale-[0.98] disabled:opacity-40"
           style={{
             background: 'linear-gradient(135deg, #E8C040, #C49020)',
@@ -152,7 +190,7 @@ export function RandomReveal() {
             fontSize: '1.1rem',
             boxShadow: '0 4px 20px rgba(224,180,60,0.4)',
           }}>
-          ابدأ الجولة ✦
+          {isOnlineGame && !isOnlineHost ? 'في انتظار الهوست يبدأ...' : 'ابدأ الجولة ✦'}
         </button>
       </div>
     </div>

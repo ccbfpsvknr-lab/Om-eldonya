@@ -141,16 +141,11 @@ export function GameBoard() {
       if (isMyTurn || isMyBotTurn) return;
 
       const { data } = await supabase.from('rooms').select('game_state').eq('id', room.id).single();
-      if (data?.game_state) {
-        const incoming = data.game_state as typeof g;
-        if (!incoming) return;
-        // Only apply if it's a newer state (different player turn or phase)
-        const cur = useMatchStore.getState().game;
-        if (!cur || incoming.currentPlayerIndex !== cur.currentPlayerIndex
-            || incoming.phase !== cur.phase || !isMyTurn) {
-          useMatchStore.setState({ game: incoming });
-          setSyncReady(true);
-        }
+      // Only apply if it's a REAL game state (has board array), not lobby/preGame data
+      if (data?.game_state?.board) {
+        const incoming = data.game_state;
+        useMatchStore.setState({ game: incoming });
+        setSyncReady(true);
       }
     }, 1500);
 
@@ -1766,10 +1761,10 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
   return (
     <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* ── Portrait overlay — ask user to rotate ── */}
-      {/* Non-host action overlay — shown when it's this player's turn */}
-      {isOnlineGame && !isOnlineHost && syncReady && game && (() => {
+      {/* Online viewer mode: when it's NOT my turn, block all interaction */}
+      {isOnlineGame && syncReady && game && (() => {
         const myPlayer = game.players[myRoomSeat];
-        const isMyTurn = myPlayer && game.players[game.currentPlayerIndex]?.id === myPlayer.id;
+        const isMyTurn = !isOnlineGame || (myPlayer && game.players[game.currentPlayerIndex]?.id === myPlayer.id);
         const phase    = game.phase;
         const myCity   = myPlayer && phase === 'turn-end'
           ? game.board[myPlayer.position]
@@ -1778,6 +1773,19 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
         const canBuy   = landedCity && !landedCity.ownerId && myPlayer
           && (myPlayer.cash ?? 0) >= landedCity.price;
 
+        if (!isMyTurn && isOnlineGame) return (
+          <div style={{
+            position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 8999, display: 'flex', alignItems: 'center', gap: 10,
+            background: 'rgba(14,23,38,0.88)', border: '1px solid rgba(56,74,110,0.4)',
+            borderRadius: 20, padding: '8px 16px',
+            fontFamily: "'Cairo', sans-serif",
+          }}>
+            <span style={{ color: '#9AA6BC', fontSize: '0.8rem' }}>
+              دور {game.players[game.currentPlayerIndex]?.name ?? '...'}
+            </span>
+          </div>
+        );
         if (!isMyTurn) return null;
         return (
           <div style={{
