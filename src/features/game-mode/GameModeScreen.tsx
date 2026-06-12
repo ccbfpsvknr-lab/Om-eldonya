@@ -155,9 +155,8 @@ export function GameModeScreen() {
                 {/* Fast / Classic toggle */}
                 <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: '#9AA6BC' }}>نوع اللعبة</p>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                  <button onClick={(e) => { e.stopPropagation(); setMode('quick'); }}
-                    style={modeBtn(mode === 'quick', t.accent)}
-                    onClick={(e) => { e.stopPropagation(); setMode('quick'); if (botCount > 2) setBotCount(2); }}>
+                  <button onClick={(e) => { e.stopPropagation(); setMode('quick'); if (botCount > 2) setBotCount(2); }}
+                    style={modeBtn(mode === 'quick', t.accent)}>
                     ⚡ سريعة
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); setMode('classic'); }}
