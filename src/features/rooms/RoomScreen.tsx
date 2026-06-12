@@ -207,7 +207,7 @@ export function RoomScreen() {
               {room.code}
             </div>
             <p style={{ margin: '6px 0 0', color: '#9AA6BC', fontSize: '0.75rem', fontFamily: "'Cairo'" }}>
-              {room.players.length} / 4 لاعبين
+              {room.players.length} / {room.mode === 'quick' ? 3 : 4} لاعبين
             </p>
           </div>
 
