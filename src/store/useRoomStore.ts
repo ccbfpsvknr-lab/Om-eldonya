@@ -120,7 +120,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
       const seat = existingPlayers.length;
       const colors = ['#E8C040', '#4FC3F7', '#81C784', '#FF8A65'];
-      const vehicles = ['🚗', '🏎️', '🚕', '🚙'];
+      const vehicles = VEHICLES.map((v) => v.emoji);
       await supabase.from('room_players').insert({
         room_id: room.id, user_id: userId, nickname,
         color: colors[seat], vehicle: vehicles[seat], seat, is_online: true, is_host: false,
@@ -235,9 +235,19 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       }
     });
 
-    // Game start event — explicit handler (wildcards don't work in Supabase)
+    // Game start event
     ch.on('broadcast', { event: 'game_start' }, ({ payload }) => {
       onEvent('game_start', payload);
+    });
+
+    // Player action requests (non-host → host)
+    ch.on('broadcast', { event: 'player_action' }, ({ payload }) => {
+      onEvent('player_action', payload);
+    });
+
+    // Buy prompt (host → non-host)
+    ch.on('broadcast', { event: 'buy_prompt' }, ({ payload }) => {
+      onEvent('buy_prompt', payload);
     });
 
     // Room updates (players joining/leaving, mode change, game start)

@@ -94,7 +94,7 @@ const cashEmoji = (n: number): string =>
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function GameBoard() {
   const navigate    = useNavigate();
-  const { room, myUserId, pushGameState, subscribe, unsubscribe, markDisconnected, markReconnected } = useRoomStore();
+  const { room, myUserId, pushGameState, subscribe, unsubscribe, markDisconnected, markReconnected, broadcastAction } = useRoomStore();
   const isOnlineGame = !!room && room.status === 'playing';
   const { confirm, open, close } = useModal();
 
@@ -139,18 +139,53 @@ export function GameBoard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineGame]);
 
-  // ── Host: push initial game state so non-hosts can sync ──────────────────
+  // ── Host authority: push state on every significant game change ────────────
+  useEffect(() => {
+    if (!isOnlineHost || !game) return;
+    // Push on phase change or player change (covers all turn transitions)
+    pushGameState(game);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.phase, game?.currentPlayerIndex, isOnlineHost]);
+
+  // ── Host: push initial state (+ retries for late-joining non-hosts) ─────────
   useEffect(() => {
     if (!isOnlineHost) return;
-    // Push immediately + retry at 1s in case non-host subscribes slightly late
-    const push = () => {
-      const g = useMatchStore.getState().game;
-      if (g) pushGameState(g);
-    };
+    const push = () => { const g = useMatchStore.getState().game; if (g) pushGameState(g); };
     push();
-    const t1 = setTimeout(push, 1000);
-    const t2 = setTimeout(push, 3000);
+    const t1 = setTimeout(push, 1500);
+    const t2 = setTimeout(push, 4000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineHost]);
+
+  // ── Host: handle action requests from non-host players ───────────────────────
+  useEffect(() => {
+    if (!isOnlineHost) return;
+    const { room: r } = useRoomStore.getState();
+    if (!r) return;
+
+    const unsubRoom = useRoomStore.subscribe(
+      (state) => state.channel,
+      (ch) => {
+        if (!ch) return;
+        ch.on('broadcast', { event: 'player_action' }, ({ payload }) => {
+          const g = useMatchStore.getState().game;
+          if (!g) return;
+          const activePid = g.players[g.currentPlayerIndex]?.id;
+          // Only process if it's actually that player's turn
+          const senderSeat = payload?.seat as number;
+          const senderPlayer = g.players[senderSeat];
+          if (!senderPlayer || senderPlayer.id !== activePid) return;
+
+          const action = payload?.action as string;
+          if (action === 'roll')        handleRoll();
+          if (action === 'end_turn')    handleEndTurn();
+          if (action === 'buy' && payload?.cityId)   buyCity(payload.cityId as string);
+          if (action === 'skip')        { /* handled by closing modal */ }
+        });
+      }
+    );
+    return () => unsubRoom();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineHost]);
 
@@ -1753,6 +1788,71 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
   return (
     <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* ── Portrait overlay — ask user to rotate ── */}
+      {/* Non-host action overlay — shown when it's this player's turn */}
+      {isOnlineGame && !isOnlineHost && syncReady && game && (() => {
+        const myPlayer = game.players[myRoomSeat];
+        const isMyTurn = myPlayer && game.players[game.currentPlayerIndex]?.id === myPlayer.id;
+        const phase    = game.phase;
+        const myCity   = myPlayer && phase === 'turn-end'
+          ? game.board[myPlayer.position]
+          : null;
+        const landedCity = myCity?.cityId ? game.cities[myCity.cityId] : null;
+        const canBuy   = landedCity && !landedCity.ownerId && myPlayer
+          && (myPlayer.cash ?? 0) >= landedCity.price;
+
+        if (!isMyTurn) return null;
+        return (
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9000,
+            background: 'linear-gradient(0deg, rgba(14,23,38,0.97) 70%, transparent)',
+            padding: '16px 20px 32px', display: 'flex', flexDirection: 'column',
+            gap: 10, alignItems: 'center', fontFamily: "'Cairo', sans-serif",
+          }}>
+            <div style={{ fontSize: '0.8rem', color: '#9AA6BC', marginBottom: 4 }}>
+              دورك! 🎲
+            </div>
+            <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 360 }}>
+              {phase === 'rolling' && (
+                <button
+                  onClick={() => broadcastAction('player_action', { action: 'roll', seat: myRoomSeat })}
+                  style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none',
+                    background: 'linear-gradient(135deg, #E8C040, #C49020)',
+                    color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
+                  🎲 ارمي النرد
+                </button>
+              )}
+              {phase === 'turn-end' && canBuy && (
+                <>
+                  <button
+                    onClick={() => broadcastAction('player_action', { action: 'buy', seat: myRoomSeat, cityId: myCity?.cityId })}
+                    style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none',
+                      background: 'linear-gradient(135deg, #E8C040, #C49020)',
+                      color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
+                    🏙️ اشتري ({landedCity?.price?.toLocaleString()})
+                  </button>
+                  <button
+                    onClick={() => broadcastAction('player_action', { action: 'end_turn', seat: myRoomSeat })}
+                    style={{ flex: 1, padding: '14px', borderRadius: 14,
+                      background: 'rgba(154,166,188,0.12)', border: '1px solid rgba(154,166,188,0.3)',
+                      color: '#9AA6BC', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer' }}>
+                    تعدّى
+                  </button>
+                </>
+              )}
+              {phase === 'turn-end' && !canBuy && (
+                <button
+                  onClick={() => broadcastAction('player_action', { action: 'end_turn', seat: myRoomSeat })}
+                  style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none',
+                    background: 'linear-gradient(135deg, #E8C040, #C49020)',
+                    color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
+                  يلا ←
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Online sync loading overlay for non-host */}
       {isOnlineGame && !syncReady && (
         <div style={{

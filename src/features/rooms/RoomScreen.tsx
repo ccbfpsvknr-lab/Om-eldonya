@@ -69,7 +69,12 @@ export function RoomScreen() {
           if (p.isBot && currentP[i]) ps.toggleBot(currentP[i].id);
         });
         useGameStore.getState().setMode(mode);
-        navigate(ROUTES.board);  // skip reveal — wait for host game state
+        // Critical: mark room as playing in store BEFORE navigating
+        // so GameBoard's isOnlineGame check evaluates to true
+        useRoomStore.setState((s) => ({
+          room: s.room ? { ...s.room, status: 'playing', mode } : null,
+        }));
+        navigate(ROUTES.board);
       }
     }, 1500);
     return () => clearInterval(poll);
@@ -244,11 +249,22 @@ export function RoomScreen() {
                           <div style={{ fontWeight: 800, color: p.color, fontSize: '0.95rem', fontFamily: "'Cairo'" }}>
                             {p.nickname}
                             {p.isHost && <span style={{ marginRight: 6, fontSize: '0.7rem', color: '#E0B43C' }}>👑</span>}
+                            {p.isBot  && <span style={{ marginRight: 6, fontSize: '0.7rem', color: '#90B8FF' }}>🤖</span>}
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: p.isOnline ? '#6EE7B7' : '#F4A38A', fontFamily: "'Cairo'" }}>
-                            {p.isOnline ? '● متصل' : '● منقطع'}
+                          <div style={{ fontSize: '0.72rem', fontFamily: "'Cairo'",
+                            color: p.isBot ? '#90B8FF' : p.isOnline ? '#6EE7B7' : '#F4A38A' }}>
+                            {p.isBot ? '● بوت' : p.isOnline ? '● متصل' : '● منقطع'}
                           </div>
                         </div>
+                        {isHost && p.isBot && room.status === 'waiting' && (
+                          <button onClick={() => removeBot(p.userId)}
+                            style={{ background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.4)',
+                              borderRadius: 8, color: '#F4A38A', fontFamily: "'Cairo'",
+                              fontWeight: 800, fontSize: '0.8rem', padding: '5px 12px', cursor: 'pointer',
+                              flexShrink: 0 }}>
+                            ✕
+                          </button>
+                        )}
                       </>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
