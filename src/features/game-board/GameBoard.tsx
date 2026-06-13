@@ -615,6 +615,7 @@ export function GameBoard() {
             : (card.spaces ?? 0);
           if (rawSteps === 0) return;
           const cashBefore = cur.cash;
+          setIsMoving(true);  // block bot before modal closes
           movePlayer(rawSteps);
           const after = useMatchStore.getState().game?.players[g2.currentPlayerIndex];
           const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
@@ -624,11 +625,29 @@ export function GameBoard() {
           const jIdx = g3?.board.findIndex((t) => t.type === 'jail') ?? 7;
           const bLen = g3?.board.length ?? 24;
           const from = player.position;
+          setIsMoving(true);  // block bot before modal closes
           goToJail(player.id);
           const steps2 = jIdx !== from ? ((jIdx - from + bLen) % bLen) : 1;
           animateAndMove(from, steps2, bLen, 0, () => {});
         } else if (card.type === 'bonus' && card.rollAgain) {
           setRollAgainPending(true);
+        } else if (card.id === 'G1') {
+          // الديوان الحكومي — collect 150 from each other active player
+          const g4 = useMatchStore.getState().game;
+          if (g4) {
+            const fee = 150;
+            g4.players.filter(p => p.isActive && p.id !== player.id).forEach(p => {
+              transferBetweenPlayers(p.id, player.id, fee);
+              checkInsolvency(p.id);
+            });
+            showToast(
+              <div className="text-center" dir="rtl">
+                <div className="text-4xl mb-2">🏛️</div>
+                <h3 className="text-xl text-gold-sheen">رسوم الديوان المحلي</h3>
+                <p className="text-sm text-content mt-1">كل لاعب دفع {fee} جنيه رسوم حكومية 😂</p>
+              </div>
+            );
+          }
         } else if ((card.type === 'money' || card.type === 'govt') && card.amount && card.amount < 0) {
           checkInsolvency(player.id);
         }

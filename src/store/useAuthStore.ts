@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (session?.user) {
         const { data } = await supabase
           .from('profiles').select('*').eq('id', session.user.id).single();
-        set({ user: session.user, session, profile: data ?? null });
+        set({ user: session.user, session, profile: data ? mapProfile(data as unknown as Record<string, unknown>) : null });
       } else {
         set({ user: null, session: null, profile: null });
       }
