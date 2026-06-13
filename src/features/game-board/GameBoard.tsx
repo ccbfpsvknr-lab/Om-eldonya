@@ -1822,128 +1822,15 @@ function BankruptcyModal({ playerId, onClose }: { playerId: string; onClose: () 
 
 // ─── SELL TO BANK MODAL ──────────────────────────────────────────────────────
 function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string; onClose: () => void }) {
-  const game                  = useMatchStore(selectGame);
-  const sellCity              = useMatchStore((s) => s.sellCity);
-  const downgradeCityUpgrade  = useMatchStore((s) => s.downgradeCityUpgrade);
+  const game                 = useMatchStore(selectGame);
+  const sellCity             = useMatchStore((s) => s.sellCity);
+  const downgradeCityUpgrade = useMatchStore((s) => s.downgradeCityUpgrade);
   if (!game) return null;
 
   const ownedCities = Object.values(game.cities).filter((c) => c.ownerId === currentPlayerId);
 
   return (
-    <div className="space-y-4" dir="rtl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      {/* ── Portrait overlay — ask user to rotate ── */}
-      {/* Online viewer mode: when it's NOT my turn, block all interaction */}
-      {isOnlineGame && syncReady && game && (() => {
-        const myPlayer = game.players[myGameIdx];
-        const isMyTurn = !isOnlineGame || (myPlayer && game.players[game.currentPlayerIndex]?.id === myPlayer.id);
-        const phase    = game.phase;
-        const myCity   = myPlayer && phase === 'turn-end'
-          ? game.board[myPlayer.position]
-          : null;
-        const landedCity = myCity?.cityId ? game.cities[myCity.cityId] : null;
-        const canBuy   = landedCity && !landedCity.ownerId && myPlayer
-          && (myPlayer.cash ?? 0) >= landedCity.price;
-
-        if (!isMyTurn && isOnlineGame) return (
-          <div style={{
-            position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 8999, display: 'flex', alignItems: 'center', gap: 10,
-            background: 'rgba(14,23,38,0.88)', border: '1px solid rgba(56,74,110,0.4)',
-            borderRadius: 20, padding: '8px 16px',
-            fontFamily: "'Cairo', sans-serif",
-          }}>
-            <span style={{ color: '#9AA6BC', fontSize: '0.8rem' }}>
-              دور {game.players[game.currentPlayerIndex]?.name ?? '...'}
-            </span>
-          </div>
-        );
-        if (!isMyTurn) return null;
-        return (
-          <div style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9000,
-            background: 'linear-gradient(0deg, rgba(14,23,38,0.97) 70%, transparent)',
-            padding: '16px 20px 32px', display: 'flex', flexDirection: 'column',
-            gap: 10, alignItems: 'center', fontFamily: "'Cairo', sans-serif",
-          }}>
-            <div style={{ fontSize: '0.8rem', color: '#9AA6BC', marginBottom: 4 }}>
-              دورك! 🎲
-            </div>
-            <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 360 }}>
-              {/* Non-host runs game locally on their turn, then syncOnline writes to DB */}
-              {phase === 'rolling' && (
-                <button onClick={handleRoll}
-                  style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none',
-                    background: 'linear-gradient(135deg, #E8C040, #C49020)',
-                    color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
-                  🎲 ارمي النرد
-                </button>
-              )}
-              {phase === 'turn-end' && canBuy && (
-                <>
-                  <button
-                    onClick={() => { if (myCity?.cityId) { buyCity(myCity.cityId); syncOnline(); } }}
-                    style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none',
-                      background: 'linear-gradient(135deg, #E8C040, #C49020)',
-                      color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
-                    🏙️ اشتري ({landedCity?.price?.toLocaleString()})
-                  </button>
-                  <button onClick={handleEndTurn}
-                    style={{ flex: 1, padding: '14px', borderRadius: 14,
-                      background: 'rgba(154,166,188,0.12)', border: '1px solid rgba(154,166,188,0.3)',
-                      color: '#9AA6BC', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer' }}>
-                    تعدّى
-                  </button>
-                </>
-              )}
-              {phase === 'turn-end' && !canBuy && (
-                <button onClick={handleEndTurn}
-                  style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none',
-                    background: 'linear-gradient(135deg, #E8C040, #C49020)',
-                    color: '#0E1726', fontWeight: 900, fontSize: '1rem', cursor: 'pointer' }}>
-                  يلا ←
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Online sync loading overlay for non-host */}
-      {isOnlineGame && !syncReady && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 99998,
-          background: '#0E1726',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 16,
-          fontFamily: "'Cairo', sans-serif",
-        }}>
-          <div style={{ fontSize: 48 }}>🎲</div>
-          <h2 style={{ color: '#E0B43C', fontWeight: 900, fontSize: '1.3rem', margin: 0 }}>
-            جاري تحميل اللعبة...
-          </h2>
-          <p style={{ color: '#9AA6BC', fontSize: '0.85rem', margin: 0 }}>
-            في انتظار الهوست يبدأ
-          </p>
-        </div>
-      )}
-
-      {isPortrait && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 99999,
-          background: '#0E1726',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          fontFamily: "'Cairo', sans-serif", textAlign: 'center', padding: 24,
-          gap: 16,
-        }}>
-          <div style={{ fontSize: 72 }}>📱</div>
-          <h2 style={{ fontSize: 28, fontWeight: 800, color: '#E0B43C', margin: 0 }}>دوّر الشاشة!</h2>
-          <p style={{ fontSize: 16, color: '#9AA6BC', margin: 0, maxWidth: 260 }}>
-            اللعبة بتشتغل أحسن في الوضع الأفقي
-          </p>
-          <div style={{ fontSize: 40 }}>🔄</div>
-        </div>
-      )}
+    <div className="space-y-4" dir="rtl">
       <div className="text-center">
         <div className="text-5xl mb-1">🏦</div>
         <h3 className="text-2xl font-extrabold text-gold-sheen">بيع للبنك</h3>
@@ -1955,49 +1842,35 @@ function SellToBankModal({ currentPlayerId, onClose }: { currentPlayerId: string
       ) : (
         <div className="space-y-3">
           {ownedCities.map((c) => {
-            const rc          = REGION_COLOR[c.region] ?? '#E0B43C';
-            const cityPrice   = Math.round(c.price * 0.75);
-            const upgradeRefund = c.level > 0 ? Math.round(c.price * 0.15 * 0.75) : 0;
+            const rc           = REGION_COLOR[c.region] ?? '#E0B43C';
+            const cityRefund   = Math.round(c.price * 0.75);
+            const upgradeRef   = c.level > 0 ? Math.round(totalUpgradeInvestment(c) * 0.75) : 0;
             return (
               <div key={c.id} style={{ borderRadius: '12px', border: `1px solid ${rc}40`, background: `${rc}10`, overflow: 'hidden' }}>
                 {/* Sell whole city */}
                 <button onClick={() => sellCity(c.id)}
-                  className="w-full flex items-center justify-between transition-all"
-                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: c.level > 0 ? `1px solid ${rc}20` : 'none', background: 'transparent' }}>
+                  className="w-full flex items-center justify-between"
+                  style={{ padding: '10px 14px', cursor: 'pointer',
+                    borderBottom: c.level > 0 ? `1px solid ${rc}20` : 'none',
+                    background: 'transparent' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '16px' }}>{CITY_EMOJI[c.name] ?? '🏙️'}</span>
                     <span style={{ color: '#EADBB7', fontWeight: 700, fontFamily: "'Cairo'", fontSize: '0.9rem' }}>{c.name}</span>
-                    {c.level > 0 && (
-                      <span style={{ color: '#FFD700', fontSize: '10px', letterSpacing: '-1px' }}>{'★'.repeat(c.level)}</span>
-                    )}
+                    {c.level > 0 && <span style={{ color: '#FFD700', fontSize: '10px' }}>{"★".repeat(c.level)}</span>}
                   </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ color: '#27AE60', fontWeight: 800, fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                      {cashEmoji(cityPrice)}+{cityPrice.toLocaleString('en-US')}
-                    </div>
-                    {c.level > 0 && (
-                      <div style={{ color: '#9AA6BC', fontFamily: 'monospace', fontSize: '0.7rem' }}>
-                        +{totalUpgradeInvestment(c) > 0 ? Math.round(totalUpgradeInvestment(c) * 0.75).toLocaleString('en-US') : 0} ترقيات
-                      </div>
-                    )}
-                    <div style={{ color: '#9AA6BC', fontSize: '0.65rem', fontFamily: "'Cairo'" }}>بيع المدينة كاملة</div>
+                  <div style={{ color: '#27AE60', fontWeight: 800, fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                    {cashEmoji(cityRefund + upgradeRef)}+{(cityRefund + upgradeRef).toLocaleString('en-US')}
                   </div>
                 </button>
 
                 {/* Sell one upgrade level */}
                 {c.level > 0 && (
                   <button onClick={() => downgradeCityUpgrade(c.id)}
-                    className="w-full flex items-center justify-between transition-all"
+                    className="w-full flex items-center justify-between"
                     style={{ padding: '8px 14px', cursor: 'pointer', background: 'transparent' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: '#FFD700', fontSize: '13px' }}>★</span>
-                      <span style={{ color: '#EADBB7', fontFamily: "'Cairo'", fontSize: '0.85rem' }}>بيع ترقية واحدة</span>
-                      <span style={{ color: '#9AA6BC', fontSize: '0.75rem' }}>
-                        ({c.level} → {c.level - 1})
-                      </span>
-                    </div>
-                    <span style={{ color: '#2A9D8F', fontWeight: 800, fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                      {cashEmoji(upgradeRefund)}+{upgradeRefund.toLocaleString('en-US')}
+                    <span style={{ color: '#9AA6BC', fontSize: '0.8rem', fontFamily: "'Cairo'" }}>بيع ترقية واحدة بس</span>
+                    <span style={{ color: '#2A9D8F', fontWeight: 800, fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                      +{Math.round(getUpgradeCost(c) * 0.75).toLocaleString('en-US')}
                     </span>
                   </button>
                 )}
