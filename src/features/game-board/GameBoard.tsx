@@ -123,9 +123,6 @@ export function GameBoard() {
   // Find nickname from room players (avoids useAuthStore circular import)
   const myNickname  = room?.players.find((p) => p.userId === myUserId)?.nickname ?? '';
   const myRoomSeat  = room?.players.find((p) => p.userId === myUserId)?.seat ?? 0; // kept for room checks only
-  // Use this everywhere instead of myRoomSeat for game logic:
-  const myGameIdx   = game ? game.players.findIndex((p) => p.name === myNickname) : -1;
-
   // Refs for action handlers — avoids stale closures in the subscribe callback
   const actionRef = useRef<{
     roll:    () => void;
@@ -203,6 +200,8 @@ export function GameBoard() {
 
   const game             = useMatchStore(selectGame);
   const cp               = useMatchStore(selectCurrentPlayer);
+  // myGameIdx must be AFTER game is declared (avoids TDZ crash)
+  const myGameIdx        = game ? game.players.findIndex((p) => p.name === myNickname) : -1;
   const rollDice         = useMatchStore((s) => s.rollDice);
   const movePlayer       = useMatchStore((s) => s.moveCurrentPlayer);
   const endTurn          = useMatchStore((s) => s.endTurn);
