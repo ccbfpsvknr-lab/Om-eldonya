@@ -24,6 +24,20 @@ interface AuthState {
   callAdminOp:     (action: string, payload: Record<string, unknown>)   => Promise<{ error?: string } & Record<string, unknown>>;
 }
 
+
+/** Map a raw Supabase profiles row to our Profile type. */
+function mapProfile(row: Record<string, unknown>): import('@/lib/supabase').Profile {
+  return {
+    id:              row.id              as string,
+    username:        row.username        as string,
+    nickname:        row.nickname        as string,
+    email:           row.email           as string | undefined,
+    coins:           (row.coins          as number) ?? 0,
+    is_admin:        (row.is_admin       as boolean | undefined),
+    favoriteVehicle: (row.favorite_vehicle as string | undefined) ?? '🛺',
+  };
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user:        null,
   profile:     null,
@@ -63,11 +77,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (profileData && (profileData.coins ?? 0) === 0) {
         await supabase.from('profiles').update({ coins: 5 }).eq('id', session.user.id);
         profileData = { ...profileData, coins: 5 };
-        set({ user: session.user, session, profile: profileData, showWelcome: true });
+        set({ user: session.user, session, profile: profileData ? mapProfile(profileData as unknown as Record<string, unknown>) : null, showWelcome: true });
       } else {
         // Update last_seen_at so friends can see when you were online
       if (session?.user?.id) supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
-      set({ user: session.user, session, profile: profileData ?? null });
+      set({ user: session.user, session, profile: profileData ? mapProfile(profileData as unknown as Record<string, unknown>) : null });
       }
     }
     set({ initialized: true });
