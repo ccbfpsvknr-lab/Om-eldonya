@@ -4,6 +4,7 @@ import { ROUTES } from '@/lib/constants';
 import { VEHICLES } from '@/lib/vehicles';
 import { usePlayersStore, useGameStore } from '@/store';
 import { useRoomStore } from '@/store/useRoomStore';
+import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { GameMode } from '@/store/useGameStore';
 
@@ -26,7 +27,15 @@ export function GameModeScreen() {
   const { room }      = useRoomStore();
 
   /* ── Handlers ──────────────────────────────────────────────────────────── */
+  const clearRoom = () => {
+    // Clear any stale online room so GameBoard sees isOnlineGame=false
+    const { channel } = useRoomStore.getState();
+    if (channel) supabase.removeChannel(channel);
+    useRoomStore.setState({ room: null, myUserId: null, channel: null });
+  };
+
   const startBots = () => {
+    clearRoom();
     resetPlayers();
     const nick = profile?.nickname || 'لاعب 1';
     addPlayer(nick, VEHICLES[0].emoji);
@@ -40,6 +49,7 @@ export function GameModeScreen() {
   };
 
   const startPassPlay = () => {
+    clearRoom();
     resetPlayers();
     setGameMode(mode as GameMode);
     navigate(ROUTES.players);
