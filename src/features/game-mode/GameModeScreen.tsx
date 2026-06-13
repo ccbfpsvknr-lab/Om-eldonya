@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { VEHICLES } from '@/lib/vehicles';
@@ -6,7 +6,7 @@ import { usePlayersStore, useGameStore } from '@/store';
 import { useRoomStore } from '@/store/useRoomStore';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
-import type { GameMode } from '@/store/useGameStore';
+import type { GameMode } from '@/types';
 
 type Mode = 'quick' | 'classic';
 type Tab  = 'online' | 'friends' | 'passplay' | 'bots';
@@ -19,6 +19,7 @@ export function GameModeScreen() {
   const [tab, setTab]         = useState<Tab | null>(null);
   const [mode, setMode]       = useState<Mode>('quick');
   const [botCount, setBotCount] = useState(1);
+  const maxBots = mode === 'quick' ? 2 : 3;
 
   const resetPlayers  = usePlayersStore((s) => s.resetPlayers);
   const addPlayer     = usePlayersStore((s) => s.addPlayer);
