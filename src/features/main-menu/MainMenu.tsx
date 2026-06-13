@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { SettingsModal } from '@/features/settings/SettingsModal';
+import { VEHICLES } from '@/lib/vehicles';
+import { useState } from 'react';
 import { useModal } from '@/hooks/useModal';
 import { useGameStore } from '@/store';
 import { ROUTES } from '@/lib/constants';
@@ -45,7 +47,8 @@ function RulesContent() {
 /* ─── Main component ───────────────────────────────────────────────────────── */
 export function MainMenu() {
   const navigate    = useNavigate();
-  const { user, profile, showWelcome, setShowWelcome } = useAuthStore();
+  const { user, profile, showWelcome, setShowWelcome, updateFavoriteVehicle } = useAuthStore();
+  const [showVehiclePicker, setShowVehiclePicker] = useState(false);
 
   // Welcome gift popup
   useEffect(() => {
@@ -261,8 +264,11 @@ export function MainMenu() {
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 pt-4 pb-2">
         {/* Profile */}
         <div className="flex items-center gap-2 rounded-2xl border border-[rgba(224,180,60,0.2)] bg-[rgba(4,11,24,0.75)] px-3 py-1.5 backdrop-blur-md">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(224,180,60,0.3)] bg-[rgba(224,180,60,0.1)] text-base">
-            👤
+          <div
+            onClick={() => user && setShowVehiclePicker(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(224,180,60,0.3)] bg-[rgba(224,180,60,0.1)] text-base"
+            style={{ cursor: user ? 'pointer' : 'default' }}>
+            {profile?.favoriteVehicle ?? '🛺'}
           </div>
           <div className="leading-tight">
             <p className="text-xs font-bold text-[#F4CE5E]">
@@ -273,6 +279,32 @@ export function MainMenu() {
             </p>
           </div>
         </div>
+
+        {/* Vehicle picker overlay */}
+        {showVehiclePicker && (
+          <div onClick={() => setShowVehiclePicker(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100,
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '60px 16px 0' }}>
+            <div onClick={(e) => e.stopPropagation()}
+              style={{ background: 'rgba(14,23,38,0.97)', border: '1px solid rgba(224,180,60,0.3)',
+                borderRadius: 16, padding: '14px', display: 'flex', flexDirection: 'column', gap: 8,
+                fontFamily: "'Cairo'", direction: 'rtl', minWidth: 160 }}>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#9AA6BC', fontWeight: 700 }}>اختار عربيتك المفضلة</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {VEHICLES.map((v) => (
+                  <button key={v.id} onClick={() => { updateFavoriteVehicle(v.emoji); setShowVehiclePicker(false); }}
+                    style={{ fontSize: '1.5rem', padding: '10px', borderRadius: 10,
+                      border: profile?.favoriteVehicle === v.emoji ? '2px solid #E8C040' : '1px solid rgba(56,74,110,0.4)',
+                      background: profile?.favoriteVehicle === v.emoji ? 'rgba(224,180,60,0.15)' : 'rgba(22,34,58,0.8)',
+                      cursor: 'pointer' }}>
+                    {v.emoji}
+                    <div style={{ fontSize: '0.6rem', color: '#9AA6BC', marginTop: 2 }}>{v.name}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Coins + Settings */}
         <div className="flex items-center gap-2">

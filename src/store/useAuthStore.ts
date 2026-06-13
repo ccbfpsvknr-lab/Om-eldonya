@@ -15,6 +15,7 @@ interface AuthState {
   signOut:         ()                                                    => Promise<void>;
   resetPassword:   (email: string)                                       => Promise<string | null>;
   updateNickname:  (nickname: string)                                    => Promise<string | null>;
+  updateFavoriteVehicle: (vehicle: string)                                => Promise<void>;
   refreshProfile:    ()                                                  => Promise<void>;
   updateUserCoins:   (userId: string, coins: number)                     => Promise<string | null>;
   setShowWelcome:    (v: boolean)                                         => void;
@@ -52,6 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           email:    session.user.email ?? '',
           coins:    0,
           is_admin: (count ?? 0) === 0,
+          favoriteVehicle: (meta.favorite_vehicle as string | undefined) ?? '🛺',
         });
         const { data: newP } = await supabase
           .from('profiles').select('*').eq('id', session.user.id).single();
@@ -140,6 +142,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
     if (error) return translateError(error.message);
     return null;
+  },
+
+  updateFavoriteVehicle: async (vehicle) => {
+    const { user } = get();
+    if (!user) return;
+    await supabase.from('profiles').update({ favorite_vehicle: vehicle }).eq('id', user.id);
+    set((s) => ({ profile: s.profile ? { ...s.profile, favoriteVehicle: vehicle } : null }));
   },
 
   updateNickname: async (nickname) => {

@@ -41,7 +41,8 @@ export function GameModeScreen() {
     clearRoom();
     resetPlayers();
     const nick = profile?.nickname || 'لاعب 1';
-    addPlayer(nick, VEHICLES[0].emoji);
+    const favVeh = profile?.favoriteVehicle ?? VEHICLES[0].emoji;
+    addPlayer(nick, favVeh);
     for (let i = 0; i < botCount; i++) {
       addPlayer('', VEHICLES[(i + 1) % VEHICLES.length].emoji);
       const players = usePlayersStore.getState().players;

@@ -28,7 +28,7 @@ export function PlayerSetup() {
   useEffect(() => {
     resetPlayers();
     if (profile?.nickname) {
-      const veh = VEHICLES[0]?.emoji ?? '🚗';
+      const veh = profile?.favoriteVehicle ?? VEHICLES[0]?.emoji ?? '🚗';
       addPlayer(profile.nickname, veh);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

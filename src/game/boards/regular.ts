@@ -27,9 +27,9 @@ export const regularBoard: TileDef[] = [
   { type: 'city',   name: 'الزقازيق',     groupId: 'd', price: 1450, baseRent: 290 }, // 13
   { type: 'city',   name: 'بنها',         groupId: 'd', price: 1600, baseRent: 320 }, // 14
   { type: 'chance', name: 'فرصة' },                                            // 15
-  { type: 'city',   name: 'الجيزة',       groupId: 'e', price: 2000, baseRent: 400 }, // 16
-  { type: 'city',   name: 'القاهرة',          groupId: 'd', price: 1750, baseRent: 350 }, // 17
-  { type: 'city',   name: 'الإسكندرية',  groupId: 'e', price: 2200, baseRent: 440 }, // 18
+  { type: 'city',   name: 'الإسكندرية',  groupId: 'd', price: 2200, baseRent: 440 }, // 16
+  { type: 'city',   name: 'الجيزة',       groupId: 'e', price: 2000, baseRent: 400 }, // 17
+  { type: 'city',   name: 'القاهرة',      groupId: 'e', price: 1750, baseRent: 350 }, // 18
   { type: 'police', name: 'كمين' },                                            // 19
 
   // ── LEFT COLUMN (top → bottom) ─────────────────────────────

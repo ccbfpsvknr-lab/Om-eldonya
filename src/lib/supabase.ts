@@ -13,4 +13,5 @@ export interface Profile {
   coins: number;
   created_at: string;
   is_admin?: boolean;
+  favoriteVehicle?: string;  // stored as favorite_vehicle in DB
 }

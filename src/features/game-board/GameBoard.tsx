@@ -1192,7 +1192,7 @@ export function GameBoard() {
                       {/* Price + Live Rent */}
                       {(() => {
                         // For unowned: show baseRent*2 (actual rent = baseRent × rentMult×2). For owned: show live rent.
-                        const liveRent = city ? (isOwned ? getCityRent(game, city) : (city.baseRent ?? 0) * 2) : 0;
+                        const liveRent = city ? (isOwned ? getCityRent(game, city) : (city.baseRent ?? 0)) : 0;
                         const fsBase = (isFastBoard || isClassicRect) ? 9 : 7;
                         const fsSBase = (isFastBoard || isClassicRect) ? 8 : 6;
                         const fs  = `${Math.round(fsBase  * deviceScale)}px`;
@@ -1493,8 +1493,8 @@ function BuyCityModal({ city, canAfford, onBuy, onPass }: {
       <div style={{ display: 'flex', borderBottom: `1px solid rgba(56,74,110,0.3)` }}>
         {[
           { label: 'التمن', value: city.price.toLocaleString('en-US'), color: regionColor, icon: cashEmoji(city.price) },
-          { label: 'الإيجار', value: (city.baseRent * 2).toLocaleString('en-US'), color: '#C75B39', icon: '🏠' },
-          { label: 'لو كملت', value: (city.baseRent * 4).toLocaleString('en-US'), color: '#2A9D8F', icon: '🏠🏠' },
+          { label: 'الإيجار', value: city.baseRent.toLocaleString('en-US'), color: '#C75B39', icon: '🏠' },
+          { label: 'لو كملت المنطقة', value: (city.baseRent * 2).toLocaleString('en-US'), color: '#2A9D8F', icon: '🏠🏠' },
         ].map(({ label, value, color, icon }) => (
           <div key={label} style={{ flex: 1, padding: '12px 8px', textAlign: 'center',
             borderLeft: '1px solid rgba(56,74,110,0.2)' }}>
