@@ -287,6 +287,17 @@ export function GameBoard() {
     return () => clearTimeout(t);
   }, [game?.phase, game?.mode, openModalCount, rollAgainPending, isMoving, endTurn]);
 
+  // ── Debt check at turn start — handle players who went negative off-turn ───
+  useEffect(() => {
+    if (!game || game.phase !== 'rolling') return;
+    const current = game.players[game.currentPlayerIndex];
+    if (!current || !current.isActive || current.cash >= 0) return;
+    // Player starts their turn in debt — trigger insolvency immediately
+    const t = setTimeout(() => checkInsolvency(current.id), 400);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.currentPlayerIndex, game?.phase]);
+
   // ── Skip-next-turn effect ─────────────────────────────────────────────────
   useEffect(() => {
     if (!game || game.phase !== 'rolling') return;
@@ -344,7 +355,6 @@ export function GameBoard() {
   const canDiceRoll  = (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) && !diceRolling && !isMoving;
   const canEnd       = phase === 'turn-end' && !isMoving && !isFast;
   const myCities = Object.values(game.cities).filter((c) => c.ownerId === cp.id);
-  const canUpgradeAny = !isFast && !game.hasUpgradedThisTurn && myCities.some((c) => canUpgrade(game, c, cp.id));
   const canSell  = myCities.length > 0 && (phase === 'rolling' || phase === 'turn-end') && !isMoving && !isFast;
 
   // Board visuals
@@ -497,6 +507,52 @@ export function GameBoard() {
           );
           checkInsolvency(player.id);
         }
+      } else {
+        // Own city — offer upgrade if available (new rule: upgrade on landing only)
+        if (game.mode !== 'quick' && canUpgrade(g, city, player.id)) {
+          if (isCurrentBot) {
+            const cost = getUpgradeCost(city);
+            if (player.cash > cost * 1.3 && Math.random() < 0.55) {
+              upgradeCity(city.id);
+              showToast(<div className="text-center" dir="rtl">
+                <div className="text-2xl mb-1">{CITY_EMOJI[city.name] ?? '🏙️'}</div>
+                <p className="text-sm font-bold text-gold-sheen">{city.name} — البوت رقّاها 🏗️</p>
+              </div>, 1400);
+            }
+          } else {
+            const cost = getUpgradeCost(city);
+            const rentNow  = getCityRent(g, city);
+            const rentNext = getCityRent(g, { ...city, level: (city.level + 1) as 0|1|2|3 });
+            let oid = '';
+            oid = open(
+              <div className="text-center space-y-3" dir="rtl">
+                <div className="text-4xl">{CITY_EMOJI[city.name] ?? '🏙️'}</div>
+                <h3 className="text-xl font-extrabold text-gold-sheen">{city.name}</h3>
+                <p className="text-sm text-muted">دي أرضك! عايز ترقيها؟</p>
+                <div className="flex justify-center gap-3 text-sm">
+                  <span style={{ color:'#9AA6BC' }}>إيجار دلوقتي: {rentNow.toLocaleString()}</span>
+                  <span>→</span>
+                  <span style={{ color:'#E8C040', fontWeight:800 }}>بعد: {rentNext.toLocaleString()} 🔥</span>
+                </div>
+                <div className="flex gap-3 mt-1">
+                  <Button block size="sm"
+                    disabled={player.cash < cost}
+                    onClick={() => { upgradeCity(city.id); close(oid);
+                      showToast(<div className="text-center" dir="rtl">
+                        <div className="text-3xl mb-1">🏗️</div>
+                        <p className="font-bold text-gold-sheen">تمت الترقية!</p>
+                        <p className="text-sm text-content mt-1">الإيجار بقى {rentNext.toLocaleString()}</p>
+                      </div>);
+                    }}>
+                    🏗️ رقّي — {cashEmoji(cost)}{cost.toLocaleString()}
+                  </Button>
+                  <Button block size="sm" variant="ghost" onClick={() => close(oid)}>مش دلوقتي</Button>
+                </div>
+              </div>,
+              { size: 'sm', hideClose: true, dismissable: false }
+            );
+          }
+        }
       }
 
     } else if (tile.type === 'police') {
@@ -562,14 +618,14 @@ export function GameBoard() {
           movePlayer(rawSteps);
           const after = useMatchStore.getState().game?.players[g2.currentPlayerIndex];
           const earnedSalary = Math.max(0, (after?.cash ?? cashBefore) - cashBefore);
-          if (!moveRef.current) animateAndMove(cur.position, rawSteps, boardLen, earnedSalary);
+          if (!moveRef.current) animateAndMove(cur.position, rawSteps, boardLen, earnedSalary, () => { resolveLanding(); });
         } else if (card.type === 'police') {
           const g3   = useMatchStore.getState().game;
           const jIdx = g3?.board.findIndex((t) => t.type === 'jail') ?? 7;
           const bLen = g3?.board.length ?? 24;
           const from = player.position;
           goToJail(player.id);
-          const steps2 = ((jIdx - from) % bLen + bLen) % bLen || bLen;
+          const steps2 = jIdx !== from ? ((jIdx - from + bLen) % bLen) : 1;
           animateAndMove(from, steps2, bLen, 0, () => {});
         } else if (card.type === 'bonus' && card.rollAgain) {
           setRollAgainPending(true);
@@ -608,6 +664,25 @@ export function GameBoard() {
       ];
       const ev = NEWS_POOL[Math.floor(Math.random() * NEWS_POOL.length)];
       applyNewsEvent(ev.effect, ev.amount);
+      // After any mass-cash event: notify players who went negative
+      setTimeout(() => {
+        const gn = useMatchStore.getState().game;
+        if (!gn) return;
+        const currentId = gn.players[gn.currentPlayerIndex]?.id;
+        gn.players.filter(p => p.isActive && p.cash < 0).forEach(p => {
+          if (p.id === currentId) {
+            checkInsolvency(p.id); // current player → handle now
+          } else {
+            showToast(
+              <div className="text-center" dir="rtl">
+                <div className="text-3xl mb-1">😬</div>
+                <p className="text-base font-extrabold text-danger">{p.name} شكله هيفلس!</p>
+                <p className="text-xs text-muted mt-1">رصيده وصل سلبي — هيتعامل معاه في دوره</p>
+              </div>, 2500
+            );
+          }
+        });
+      }, 300);
       showToast(
         <div className="text-center space-y-2" dir="rtl">
           <div className="text-5xl">{ev.icon}</div>
@@ -847,6 +922,7 @@ export function GameBoard() {
   useEffect(() => {
     if (!game || !cp || !cp.isBot || isMoving || diceRolling) return;
     if (isOnlineGame && !isOnlineHost) return; // only host runs bots in online games
+    if (cp.skipTurns > 0) return;  // skip-turn effect will handle ending the turn
 
     if (phase === 'rolling' || (rollAgainPending && phase === 'turn-end')) {
       // In online game, each device only controls its own seat
@@ -870,20 +946,6 @@ export function GameBoard() {
         const cur = g2?.players[g2?.currentPlayerIndex ?? -1];
         // Only act if it's still THIS bot's turn
         if (!g2 || !cur?.isBot || cur.id !== myPlayerId) return;
-        // Upgrade: own full region, can afford, hasn't upgraded yet (not in fast mode)
-        if (!g2.hasUpgradedThisTurn && g2.mode !== 'quick') {
-          const cities = Object.values(g2.cities);
-          for (const city of cities) {
-            if (city.ownerId !== cur.id) continue;
-            if (canUpgrade(g2, city, cur.id)) {
-              const cost = getUpgradeCost(city);
-              if (cur.cash > cost * 1.6 && Math.random() < 0.45) {
-                upgradeCity(city.id);
-                break;
-              }
-            }
-          }
-        }
         setTimeout(() => {
           const g3 = useMatchStore.getState().game;
           // Double-check: still this bot's turn
@@ -1192,10 +1254,10 @@ export function GameBoard() {
                   {/* Smoke — at tile edge toward next tile */}
                   {hasSmoke && (() => {
                     const ss: React.CSSProperties = { position: 'absolute', fontSize: '14px', pointerEvents: 'none', zIndex: 25 };
-                    if (edge === 'bottom') { ss.left = '50%'; ss.top = '-8px'; ss.transform = 'translateX(-50%)'; }
-                    else if (edge === 'right')  { ss.top = '50%'; ss.left = '-8px'; ss.transform = 'translateY(-50%)'; }
-                    else if (edge === 'top')    { ss.left = '50%'; ss.bottom = '-8px'; ss.transform = 'translateX(-50%)'; }
-                    else                        { ss.top = '50%'; ss.right = '-8px'; ss.transform = 'translateY(-50%)'; }
+                    if (edge === 'bottom') { ss.left = '50%'; ss.bottom = '-8px'; ss.transform = 'translateX(-50%)'; }
+                    else if (edge === 'right')  { ss.top = '50%'; ss.right = '-8px'; ss.transform = 'translateY(-50%)'; }
+                    else if (edge === 'top')    { ss.left = '50%'; ss.top = '-8px'; ss.transform = 'translateX(-50%)'; }
+                    else                        { ss.top = '50%'; ss.left = '-8px'; ss.transform = 'translateY(-50%)'; }
                     return <div className="animate-smoke-out" style={ss}>💨</div>;
                   })()}
                 </div>
@@ -1325,11 +1387,8 @@ export function GameBoard() {
                       </button>
                     </div>
 
-                    {!cp?.isBot && (canEnd || canUpgradeAny || canSell) && (
+                    {!cp?.isBot && (canEnd || canSell) && (
                       <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>
-                        {canUpgradeAny && (
-                          <button onClick={openUpgradeModal} style={{ flex: 1, borderRadius: '5px', padding: isFastBoard?'5px':'2px', fontSize: isFastBoard?'10px':'7px', fontWeight: 700, background: 'rgba(42,157,143,0.15)', border: '1px solid rgba(42,157,143,0.4)', color: '#2A9D8F', cursor: 'pointer' }}>🏗️ رقّي</button>
-                        )}
                         {canSell && (
                           <button onClick={openSellModal} style={{ flex: 1, borderRadius: '5px', padding: (isFastBoard||isClassicRect)?'5px':'2px', fontSize: (isFastBoard||isClassicRect)?'10px':'7px', fontWeight: 700, background: 'rgba(199,91,57,0.15)', border: '1px solid rgba(199,91,57,0.35)', color: '#C75B39', cursor: 'pointer' }}>🏦 بيع للبنك</button>
                         )}

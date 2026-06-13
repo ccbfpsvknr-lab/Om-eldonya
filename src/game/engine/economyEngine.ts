@@ -25,9 +25,9 @@ export function computeRegionOwners(game: Game): Record<string, string | null> {
 /**
  * Rent for landing on `city`. Accounts for:
  * - No owner → 0
- * - Region incomplete → baseRent
+ * - Region incomplete, level 0 → baseRent (= price × 20%)
  * - Region complete, level 0 → baseRent × 2
- * - Region complete, level 1-3 → baseRent × UPGRADE_MULTIPLIERS[level] × 2
+ * - Upgrade level N → baseRent × UPGRADE_MULTIPLIERS[N] × (2 if region)
  * - Active news rent modifier (newsRentMultiplier, default 1.0)
  */
 export function getCityRent(game: Game, city: City): number {
@@ -37,6 +37,5 @@ export function getCityRent(game: Game, city: City): number {
   const regionMult = complete ? 2 : 1;
   const newsMultiplier = game.newsRentMultiplier ?? 1;
   // Classic also uses ×2 to keep games moving
-  const rentMult = 2;
-  return Math.round(city.baseRent * levelMult * regionMult * newsMultiplier * rentMult);
+  return Math.round(city.baseRent * levelMult * regionMult * newsMultiplier);
 }

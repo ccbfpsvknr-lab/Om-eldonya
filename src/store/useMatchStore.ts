@@ -8,7 +8,19 @@ import { computeRegionOwners, getCityRent, isRegionComplete } from '@/game/engin
 import { canUpgrade, getUpgradeCost, stripRegionUpgrades } from '@/game/engine/upgradeEngine';
 import { getCard } from '@/game/data/chanceCards';
 
-const SALFA_AMOUNT = 2000;
+const SALFA_AMOUNT = 1500;
+
+/** Route any cash gain through salfa debt first. */
+function addGain(p: { cash: number; solfaDebt: number; totalEarned: number }, amount: number, trackEarned = false) {
+  if (amount <= 0) return {};
+  const pay = Math.min(amount, p.solfaDebt);
+  return {
+    cash: p.cash + amount - pay,
+    solfaDebt: p.solfaDebt - pay,
+    ...(trackEarned ? { totalEarned: p.totalEarned + amount } : {}),
+  };
+}
+
 const TAX_AMOUNT = 500;
 const NEWS_EVENTS = [
   { id: 'NE1', title: 'ارتفاع الأسعار 📈', text: 'الإيجارات زادت ٢٥٪ لـ ٣ جولات!', rentMult: 1.25, cash: 0, rounds: 3 },
@@ -229,7 +241,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
     const players = game.players.map((p) => {
       if (p.id === payer.id) return { ...p, cash: p.cash - amount };
-      if (p.id === ownerId) return { ...p, cash: p.cash + amount, totalEarned: p.totalEarned + amount };
+      if (p.id === ownerId) return { ...p, ...addGain(p, amount, true) };
       return p;
     });
     set({ game: { ...game, players } });
@@ -272,7 +284,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       [cityId]: { ...updatedCities[cityId], ownerId: null, level: 0 },
     };
     const players = game.players.map((p) =>
-      p.id === player.id ? { ...p, cash: p.cash + totalGain } : p
+      p.id === player.id ? { ...p, ...addGain(p, totalGain) } : p
     );
     const regionOwners = computeRegionOwners({ ...game, cities: releasedCities });
     set({ game: { ...game, players, cities: releasedCities, regionOwners } });
@@ -379,7 +391,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
     if (card.type === 'money' && card.amount) {
       players = players.map((p, i) => i === idx ? {
-        ...p, cash: p.cash + card.amount!,
+        ...addGain(p, card.amount!),
         totalEarned: card.amount! > 0 ? p.totalEarned + card.amount! : p.totalEarned,
       } : p);
       set({ game: { ...game, players } });
@@ -387,7 +399,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       players = players.map((p, i) => i === idx ? { ...p, hasRentFreePass: true } : p);
       set({ game: { ...game, players } });
     } else if (card.type === 'govt' && card.amount) {
-      players = players.map((p, i) => i === idx ? { ...p, cash: p.cash + card.amount! } : p);
+      players = players.map((p, i) => i === idx ? { ...p, ...addGain(p, card.amount!) } : p);
       set({ game: { ...game, players } });
     }
     // movement, rollAgain, police, skipNextTurn: handled in component
@@ -486,7 +498,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       if (!s.game) return s;
       const players = s.game.players.map((p) => {
         if (p.id === fromId) return { ...p, cash: p.cash - amount };
-        if (p.id === toId)   return { ...p, cash: p.cash + amount };
+        if (p.id === toId)   return { ...p, ...addGain(p, amount) };
         return p;
       });
       return { game: { ...s.game, players } };
@@ -523,11 +535,11 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         players = players.map(p => p.isActive ? { ...p, cash: p.cash - amount } : p);
         break;
       case 'allGain':
-        players = players.map(p => p.isActive ? { ...p, cash: p.cash + amount } : p);
+        players = players.map(p => p.isActive ? { ...p, ...addGain(p, amount) } : p);
         break;
       case 'richestGain': {
         const r = [...active].sort((a,b) => b.cash - a.cash)[0];
-        if (r) players = players.map(p => p.id === r.id ? { ...p, cash: p.cash + amount } : p);
+        if (r) players = players.map(p => p.id === r.id ? { ...p, ...addGain(p, amount) } : p);
         break;
       }
       case 'richestPaysPoarest': {
@@ -536,7 +548,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         if (r2 && poor && r2.id !== poor.id) {
           players = players.map(p =>
             p.id === r2.id ? { ...p, cash: p.cash - amount }
-            : p.id === poor.id ? { ...p, cash: p.cash + amount }
+            : p.id === poor.id ? { ...p, ...addGain(p, amount) }
             : p);
         }
         break;

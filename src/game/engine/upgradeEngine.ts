@@ -22,9 +22,8 @@ export function totalUpgradeInvestment(city: City): number {
 export function canUpgrade(game: Game, city: City, playerId: string): boolean {
   if (city.ownerId !== playerId) return false;
   if (city.level >= MAX_UPGRADE_LEVEL) return false;
-  // Can only upgrade when player owns the full region.
-  const regionCities = Object.values(game.cities).filter((c) => c.region === city.region);
-  return regionCities.every((c) => c.ownerId === playerId);
+  const player = game.players.find((p) => p.id === playerId);
+  return (player?.cash ?? 0) >= getUpgradeCost(city);
 }
 
 /**
