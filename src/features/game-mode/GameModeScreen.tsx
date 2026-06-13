@@ -24,7 +24,8 @@ export function GameModeScreen() {
   const resetPlayers  = usePlayersStore((s) => s.resetPlayers);
   const addPlayer     = usePlayersStore((s) => s.addPlayer);
   const toggleBot     = usePlayersStore((s) => s.toggleBot);
-  const setGameMode   = useGameStore((s) => s.setMode);
+  const setGameMode     = useGameStore((s) => s.setMode);
+  const setOnlineMode   = useGameStore((s) => s.setOnlineMode);
   const { room }      = useRoomStore();
 
   /* ── Handlers ──────────────────────────────────────────────────────────── */
@@ -36,6 +37,7 @@ export function GameModeScreen() {
   };
 
   const startBots = () => {
+    setOnlineMode(false);
     clearRoom();
     resetPlayers();
     const nick = profile?.nickname || 'لاعب 1';
@@ -50,6 +52,7 @@ export function GameModeScreen() {
   };
 
   const startPassPlay = () => {
+    setOnlineMode(false);
     clearRoom();
     resetPlayers();
     setGameMode(mode as GameMode);
@@ -57,6 +60,7 @@ export function GameModeScreen() {
   };
 
   const startFriends = () => {
+    setOnlineMode(true);
     if (!profile) { navigate(ROUTES.auth); return; }
     useRoomStore.getState().setMode?.(mode);
     navigate(ROUTES.rooms);

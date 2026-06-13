@@ -96,7 +96,7 @@ const cashEmoji = (n: number): string =>
 export function GameBoard() {
   const navigate    = useNavigate();
   const { room, myUserId, pushGameState, subscribe, unsubscribe, markDisconnected, markReconnected, broadcastAction } = useRoomStore();
-  const isOnlineGame = !!room && room.status === 'playing';
+  const isOnlineGame = useGameStore((s) => s.isOnlineMode);  // set explicitly per mode — no inference
   const { confirm, open, close } = useModal();
 
   // ── 20-min late-game tracker ─────────────────────────────────────────────

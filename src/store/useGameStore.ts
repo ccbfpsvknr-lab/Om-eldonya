@@ -10,7 +10,9 @@ interface GameState {
   // ---- actions ----
   createGame: (partial?: Partial<GameConfig>) => void;
   updateConfig: (partial: Partial<GameConfig>) => void;
-  setMode: (mode: GameMode) => void;
+  setMode:         (mode: GameMode)   => void;
+  setOnlineMode:   (v: boolean)       => void;
+  isOnlineMode:    boolean;
   setPhase: (phase: GamePhase) => void;
   setWinner: (winnerId: string | null) => void;
   resetGame: () => void;
@@ -37,6 +39,8 @@ export const useGameStore = create<GameState>((set) => ({
   updateConfig: (partial) =>
     set((state) => ({ config: { ...state.config, ...partial } })),
 
+  isOnlineMode: false,
+  setOnlineMode: (v) => set({ isOnlineMode: v }),
   setMode: (mode) => set((state) => ({ config: { ...state.config, mode } })),
 
   setPhase: (phase) => set(() => ({ phase })),
